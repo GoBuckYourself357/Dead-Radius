@@ -56,6 +56,7 @@ h2{margin:0 0 6px;font-size:18px}h3{margin:12px 0 6px;font-size:14px;color:var(-
 @keyframes fade{0%{opacity:0;transform:translateY(-6px)}8%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0}}
 .site{font-size:21px;line-height:30px;text-align:center;width:30px;height:30px;border-radius:50%;background:#000a;border:1px solid #fff3;filter:drop-shadow(0 0 3px #000)}
 .site.looted{filter:grayscale(1);opacity:.4}
+.site.res{width:26px;height:26px;line-height:26px;font-size:16px;background:#0b1f12b0;border-color:#5cc98a55}
 .site.inr{border-color:var(--acc);box-shadow:0 0 8px var(--acc)}
 .zmb{font-size:26px;line-height:30px;text-align:center;animation:sway 1.6s ease-in-out infinite;filter:drop-shadow(0 0 4px #f00a)}
 .zmb.runner{font-size:22px;animation-duration:.6s;filter:drop-shadow(0 0 4px #ff0a)}
@@ -161,24 +162,51 @@ const ITEMS={
  spikedbat:{n:'Spiked Bat',icon:'🏏',w:2.5,t:'weapon',dmg:[11,18],hit:.76,dur:40,stun:.25},
  crowbar:{n:'Crowbar',icon:'🔧',w:2,t:'weapon',dmg:[8,14],hit:.78,dur:50,stun:.15,lootBonus:1},
  machete:{n:'Machete',icon:'⚔️',w:1.5,t:'weapon',dmg:[10,17],hit:.8,dur:35},
- axe:{n:'Fire Axe',icon:'🪓',w:3,t:'weapon',dmg:[13,22],hit:.7,dur:40,stun:.2},
+ axe:{n:'Fire Axe',icon:'🪓',w:3,t:'weapon',dmg:[13,22],hit:.7,dur:40,stun:.2,tool:'chop'},
+ stoneaxe:{n:'Stone Axe',icon:'🪓',w:2,t:'weapon',dmg:[6,11],hit:.75,dur:30,tool:'chop'},
+ pickaxe:{n:'Pickaxe',icon:'⛏️',w:3,t:'weapon',dmg:[9,15],hit:.7,dur:60,tool:'mine'},
+ spear:{n:'Wooden Spear',icon:'🦯',w:1.5,t:'weapon',dmg:[6,11],hit:.84,dur:20},
+ sword:{n:'Forged Blade',icon:'🗡️',w:2,t:'weapon',dmg:[14,22],hit:.82,dur:60},
+ sledge:{n:'Sledgehammer',icon:'🔨',w:4,t:'weapon',dmg:[16,26],hit:.68,dur:70,stun:.35},
+ crossbow:{n:'Crossbow',icon:'🏹',w:3,t:'weapon',dmg:[14,21],hit:.84,dur:60,ammo:'bolts',noise:0,range:true},
+ bolts:{n:'Crossbow Bolts',icon:'🪶',w:.05,t:'ammo'},
+ padded:{n:'Padded Jacket',icon:'🧥',w:2,t:'armor',def:2,dur:30},
+ scraparmor:{n:'Scrap Armor',icon:'🦺',w:6,t:'armor',def:4,dur:45},
+ ironarmor:{n:'Iron Plate Armor',icon:'🛡️',w:9,t:'armor',def:7,dur:70},
+ wood:{n:'Wood',icon:'🪵',w:1,t:'mat'},
+ stone:{n:'Stone',icon:'🪨',w:1.5,t:'mat'},
+ ore:{n:'Iron Ore',icon:'🟤',w:1.5,t:'mat'},
+ iron:{n:'Iron Ingot',icon:'⛓️',w:1,t:'mat'},
+ herbs:{n:'Medicinal Herbs',icon:'🌿',w:.1,t:'mat'},
+ wheat:{n:'Wheat',icon:'🌾',w:.3,t:'mat'},
+ potato:{n:'Potato',icon:'🥔',w:.3,t:'food',food:10},
+ corn:{n:'Corn',icon:'🌽',w:.3,t:'food',food:12},
+ s_potato:{n:'Seed Potatoes',icon:'🌱',w:.2,t:'seed'},
+ s_corn:{n:'Corn Seeds',icon:'🌱',w:.05,t:'seed'},
+ s_wheat:{n:'Wheat Seeds',icon:'🌱',w:.05,t:'seed'},
+ s_herb:{n:'Herb Seeds',icon:'🌱',w:.05,t:'seed'},
+ bread:{n:'Bread',icon:'🍞',w:.5,t:'food',food:40},
+ bakedpotato:{n:'Baked Potato',icon:'🍠',w:.3,t:'food',food:28},
+ stew:{n:'Hearty Stew',icon:'🍲',w:1,t:'food',food:55,water:15},
+ salve:{n:'Herbal Salve',icon:'🫙',w:.2,t:'heal',hp:25},
+ tea:{n:'Herbal Tea',icon:'🍵',w:.4,t:'drink',water:25,stam:40},
  pistol:{n:'Pistol',icon:'🔫',w:1.5,t:'weapon',dmg:[14,22],hit:.8,dur:120,ammo:'ammo9',noise:2,range:true},
  shotgun:{n:'Shotgun',icon:'💥',w:4,t:'weapon',dmg:[22,36],hit:.85,dur:80,ammo:'shells',noise:3,aoe:true,range:true},
  molotov:{n:'Molotov',icon:'🔥',w:1,t:'throw',dmg:[18,32],noise:1},
 };
 const LOOT={
- grocery:[['water',5,1,3],['canned',5,1,3],['snack',4,1,3],['soda',3,1,2],['bottle',2,1,2],['battery',2,1,2],['knife',1,1,1],['tape',1,1,1],['cloth',1,1,2]],
+ grocery:[['water',5,1,3],['canned',5,1,3],['snack',4,1,3],['soda',3,1,2],['bottle',2,1,2],['battery',2,1,2],['knife',1,1,1],['tape',1,1,1],['cloth',1,1,2],['s_potato',1,1,2],['potato',1.5,1,3],['corn',1,1,2],['s_corn',.4,1,2],['s_wheat',.3,1,2]],
  pharmacy:[['painkillers',5,1,3],['bandage',4,1,3],['firstaid',2,1,1],['antibiotics',2,1,2],['water',2,1,2],['snack',2,1,2],['battery',1,1,2],['cloth',1,1,2]],
- hardware:[['nails',5,2,6],['scrap',4,1,3],['tape',4,1,2],['crowbar',1,1,1],['axe',.6,1,1],['machete',.6,1,1],['bat',.8,1,1],['fuel',2,1,1],['battery',2,1,3],['cloth',1,1,2]],
+ hardware:[['nails',5,2,6],['scrap',4,1,3],['tape',4,1,2],['crowbar',1,1,1],['axe',.6,1,1],['machete',.6,1,1],['bat',.8,1,1],['fuel',2,1,1],['battery',2,1,3],['cloth',1,1,2],['wood',2,1,3],['s_potato',.8,1,2],['s_corn',.8,1,2],['s_wheat',.8,1,2],['s_herb',.8,1,2]],
  fuel:[['fuel',5,1,2],['snack',4,1,3],['soda',4,1,3],['water',3,1,2],['bottle',2,1,2],['battery',2,1,2],['tape',1,1,1],['ammo9',.3,2,6]],
- food:[['canned',3,1,2],['snack',3,1,2],['soda',4,1,3],['water',3,1,2],['knife',2,1,1],['bottle',3,1,2],['cloth',1,1,2]],
+ food:[['canned',3,1,2],['snack',3,1,2],['soda',4,1,3],['water',3,1,2],['knife',2,1,1],['bottle',3,1,2],['cloth',1,1,2],['potato',1,1,2]],
  medical:[['firstaid',3,1,1],['bandage',4,1,3],['antibiotics',3,1,2],['painkillers',4,1,3],['cloth',2,1,2]],
  police:[['ammo9',5,3,10],['pistol',1,1,1],['shells',3,2,6],['shotgun',.5,1,1],['bandage',2,1,2],['firstaid',1,1,1],['crowbar',.5,1,1],['battery',2,1,3]],
  outdoor:[['bat',2,1,1],['machete',1.5,1,1],['axe',1,1,1],['knife',2,1,1],['shells',2,2,6],['ammo9',1.5,3,8],['water',2,1,2],['snack',2,1,3],['shotgun',.3,1,1],['pistol',.2,1,1]],
- auto:[['scrap',5,1,3],['fuel',3,1,1],['tape',3,1,2],['crowbar',2,1,1],['battery',3,1,3],['cloth',2,1,2],['nails',2,2,5]],
- house:[['canned',3,1,2],['water',3,1,2],['snack',2,1,2],['soda',2,1,2],['painkillers',2,1,2],['bandage',2,1,2],['cloth',3,1,3],['knife',2,1,1],['bat',1,1,1],['battery',2,1,2],['bottle',2,1,2],['tape',1,1,1],['ammo9',.4,2,5],['shells',.4,2,4],['pistol',.1,1,1],['shotgun',.1,1,1]],
- industrial:[['scrap',5,1,4],['nails',3,2,6],['tape',2,1,2],['fuel',2,1,1],['crowbar',1,1,1],['axe',.5,1,1],['cloth',1,1,2],['water',1,1,1]],
- store:[['snack',2,1,2],['soda',2,1,2],['water',2,1,2],['cloth',3,1,3],['battery',3,1,3],['tape',2,1,2],['bottle',2,1,2],['knife',1,1,1],['bat',.5,1,1]],
+ auto:[['scrap',5,1,3],['fuel',3,1,1],['tape',3,1,2],['crowbar',2,1,1],['battery',3,1,3],['cloth',2,1,2],['nails',2,2,5],['iron',.3,1,1]],
+ house:[['canned',3,1,2],['water',3,1,2],['snack',2,1,2],['soda',2,1,2],['painkillers',2,1,2],['bandage',2,1,2],['cloth',3,1,3],['knife',2,1,1],['bat',1,1,1],['battery',2,1,2],['bottle',2,1,2],['tape',1,1,1],['ammo9',.4,2,5],['shells',.4,2,4],['pistol',.1,1,1],['shotgun',.1,1,1],['wood',.5,1,2],['s_potato',.4,1,2],['s_corn',.3,1,2],['s_herb',.3,1,2],['s_wheat',.2,1,2]],
+ industrial:[['scrap',5,1,4],['nails',3,2,6],['tape',2,1,2],['fuel',2,1,1],['crowbar',1,1,1],['axe',.5,1,1],['cloth',1,1,2],['water',1,1,1],['ore',.8,1,2],['iron',.4,1,2],['wood',1,1,3]],
+ store:[['snack',2,1,2],['soda',2,1,2],['water',2,1,2],['cloth',3,1,3],['battery',3,1,3],['tape',2,1,2],['bottle',2,1,2],['knife',1,1,1],['bat',.5,1,1],['s_herb',.3,1,1]],
  civic:[['water',2,1,2],['snack',2,1,2],['painkillers',2,1,2],['bandage',2,1,2],['cloth',2,1,3],['battery',2,1,2],['firstaid',.5,1,1],['canned',1,1,2]],
 };
 const CAT={
@@ -201,7 +229,42 @@ const RECIPES=[
  {out:'spikedbat',q:1,need:{bat:1,nails:4}},
  {out:'molotov',q:1,need:{bottle:1,fuel:1,cloth:1}},
  {out:'firstaid',q:1,need:{bandage:3,painkillers:1}},
+ {out:'stoneaxe',q:1,need:{wood:1,stone:1,cloth:1}},
+ {out:'spear',q:1,need:{wood:2,tape:1}},
+ {st:'workbench',out:'padded',q:1,need:{cloth:6,tape:1}},
+ {st:'workbench',out:'scraparmor',q:1,need:{scrap:6,tape:2,cloth:2}},
+ {st:'workbench',out:'crossbow',q:1,need:{wood:4,scrap:2,cloth:2}},
+ {st:'workbench',out:'bolts',q:6,need:{wood:1,scrap:1}},
+ {st:'oven',out:'bread',q:2,need:{wheat:3,water:1,wood:1}},
+ {st:'oven',out:'bakedpotato',q:2,need:{potato:2,wood:1}},
+ {st:'oven',out:'stew',q:1,need:{potato:1,corn:1,water:1,wood:1}},
+ {st:'forge',out:'iron',q:1,need:{ore:2,wood:1}},
+ {st:'forge',out:'iron',q:1,need:{scrap:3,wood:1}},
+ {st:'forge',out:'nails',q:8,need:{iron:1,wood:1}},
+ {st:'forge',out:'pickaxe',q:1,need:{iron:1,wood:2}},
+ {st:'forge',out:'sword',q:1,need:{iron:3,wood:1,cloth:1}},
+ {st:'forge',out:'sledge',q:1,need:{iron:4,wood:2}},
+ {st:'forge',out:'ironarmor',q:1,need:{iron:5,cloth:3,tape:1}},
+ {st:'apothecary',out:'salve',q:1,need:{herbs:2,cloth:1}},
+ {st:'apothecary',out:'tea',q:1,need:{herbs:1,water:1}},
+ {st:'apothecary',out:'painkillers',q:2,need:{herbs:2,water:1}},
+ {st:'apothecary',out:'antibiotics',q:1,need:{herbs:3,bottle:1,water:1}},
 ];
+const STATIONS={
+ workbench:{n:'Workbench',icon:'🪚',cost:{wood:6,nails:4},desc:'Armor, crossbow & bolts.'},
+ oven:{n:'Stone Oven',icon:'🧱',cost:{stone:10,wood:4},desc:'Bake bread, potatoes and stew (burns wood).'},
+ forge:{n:'Blacksmith Forge',icon:'⚒️',cost:{stone:12,wood:6,scrap:4},req:'workbench',desc:'Smelt iron; forge tools, weapons, plate armor.'},
+ apothecary:{n:'Apothecary Table',icon:'🧪',cost:{wood:4,bottle:3,cloth:2},req:'workbench',desc:'Brew salves, tea, painkillers, antibiotics from herbs.'},
+ rainbarrel:{n:'Rain Barrel',icon:'🛢️',cost:{wood:4,scrap:2,tape:1},desc:'Collects 1 water every 30 min (holds 5).'},
+};
+const PLOT_COST={wood:4,stone:2},MAX_PLOTS=8;
+const CROPS={
+ potato:{n:'Potatoes',seed:'s_potato',out:'potato',q:[2,4],min:120},
+ corn:{n:'Corn',seed:'s_corn',out:'corn',q:[2,3],min:180},
+ wheat:{n:'Wheat',seed:'s_wheat',out:'wheat',q:[3,5],min:150},
+ herb:{n:'Herbs',seed:'s_herb',out:'herbs',q:[2,4],min:90},
+};
+const RES={tree:{icon:'🌲',n:'Trees',verb:'🪓 Chop wood'},rock:{icon:'🪨',n:'Rock Outcrop',verb:'⛏️ Mine stone'},herb:{icon:'🌿',n:'Wild Herbs',verb:'🤲 Forage'}};
 
 /* ================= HELPERS ================= */
 const $=s=>document.querySelector(s);
@@ -220,6 +283,8 @@ function fresh(){return{p:{hp:100,maxHp:100,food:80,water:80,stam:100,inf:false,
   inv:{water:1,snack:1,bandage:1},wdur:{},equip:'fists',base:null,stash:{},looted:{},demoPos:null};}
 let S;try{S=JSON.parse(localStorage.getItem(CFG.SAVE));}catch(e){}
 if(!S||!S.p)S=fresh();
+S.st=S.st||{};S.plots=S.plots||[];S.rain=S.rain||{n:0,t:Date.now()};S.harv=S.harv||{};S.armor=S.armor||null;if(S.rural==null)S.rural=.5;
+for(const k in S.harv)if(Date.now()-S.harv[k]>7200000)delete S.harv[k];
 function save(){try{localStorage.setItem(CFG.SAVE,JSON.stringify(S));}catch(e){}}
 
 let pos=null,acc=0,speed=0,lastFix=null,demo=false,demoSpeed=1,demoTarget=null,follow=true,started=false;
@@ -238,9 +303,9 @@ map.on('click',e=>{if(!demo||E)return;demoTarget={lat:e.latlng.lat,lng:e.latlng.
   if(targetMk)targetMk.setLatLng(e.latlng);else targetMk=L.circleMarker(e.latlng,{radius:5,color:'#ffd59e',weight:2,fill:false}).addTo(map);});
 
 /* ================= UI BASICS ================= */
-function toast(msg,cls=''){if(IN&&!E)return inMsg(msg);const d=document.createElement('div');d.textContent=msg;if(cls)d.style.borderColor=cls;$('#toast').appendChild(d);setTimeout(()=>d.remove(),3300);log(msg);}
+function toast(msg,cls=''){if(IN&&!E)return inMsg(msg);const d=document.createElement('div');d.textContent=msg;if(cls)d.style.borderColor=cls;const tc=$('#toast');tc.appendChild(d);while(tc.children.length>3)tc.firstChild.remove();setTimeout(()=>d.remove(),3300);log(msg);}
 function log(msg){LOG.unshift(new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'  '+msg);LOG.length=Math.min(LOG.length,60);}
-function sheet(html,fn){$('#sheet').innerHTML='<button class="x" onclick="closeSheet()">✕</button>'+html;$('#sheet').classList.add('open');curSheet=fn||null;}
+function sheet(html,fn){const el=$('#sheet'),was=el.classList.contains('open')?el.querySelector('h2')?.textContent:null,st=el.scrollTop;el.innerHTML='<button class="x" onclick="closeSheet()">✕</button>'+html;el.classList.add('open');if(was&&was===el.querySelector('h2')?.textContent)el.scrollTop=st;else el.scrollTop=0;curSheet=fn||null;}
 function closeSheet(){$('#sheet').classList.remove('open');curSheet=null;}
 function modal(html){$('#mbox').innerHTML=html;$('#modal').classList.add('open');}
 function closeModal(){$('#modal').classList.remove('open');}
@@ -251,13 +316,15 @@ function invWeight(bag=S.inv){let w=0;for(const[k,q]of Object.entries(bag))w+=(I
 const overloaded=()=>invWeight()>cap();
 function addItem(id,q=1,bag=S.inv){bag[id]=(bag[id]||0)+q;}
 function remItem(id,q=1,bag=S.inv){bag[id]=(bag[id]||0)-q;if(bag[id]<=0){delete bag[id];if(bag===S.inv)delete S.wdur[id];}fixEquip();}
-function fixEquip(){if(S.equip!=='fists'&&!S.inv[S.equip])S.equip='fists';}
+function fixEquip(){if(S.equip!=='fists'&&!S.inv[S.equip])S.equip='fists';if(S.armor&&!S.inv[S.armor])S.armor=null;}
+const hasTool=t=>Object.keys(S.inv).find(k=>ITEMS[k]?.tool===t)||null;
+const armorDef=()=>S.armor?ITEMS[S.armor].def:0;
 const weapon=()=>S.equip==='fists'?FISTS:ITEMS[S.equip];
 const durOf=id=>S.wdur[id]??ITEMS[id].dur;
 function wear(id){if(id==='fists')return;S.wdur[id]=durOf(id)-1;if(S.wdur[id]<=0){const n=ITEMS[id].n;delete S.wdur[id];remItem(id);elog(`Your ${n} broke!`,'r');}}
 function useItem(id,combat){
   const it=ITEMS[id];if(!it||!S.inv[id])return false;const p=S.p;
-  if(it.t==='food'||it.t==='drink'){if(it.food)p.food=Math.min(100,p.food+it.food);if(it.water)p.water=Math.min(100,p.water+it.water);}
+  if(it.t==='food'||it.t==='drink'){if(it.food)p.food=Math.min(100,p.food+it.food);if(it.water)p.water=Math.min(100,p.water+it.water);if(it.stam)p.stam=Math.min(100,p.stam+it.stam);}
   else if(it.t==='heal'){p.hp=Math.min(p.maxHp,p.hp+it.hp);if(it.cure&&p.inf){p.inf=false;(combat?elog:toast)('Infection cured.','g');}}
   else if(it.t==='throw'){if(!combat){toast('Only usable in a fight.');return false;}
     let tot=0;for(const z of E.zs)if(z.hp>0){const d=ri(it.dmg[0],it.dmg[1]);z.hp-=d;tot+=d;}
@@ -296,7 +363,7 @@ function siteName(t,cat){
 }
 async function scan(){
   if(scanning||!pos)return;scanning=true;lastScan={...pos};
-  const q=`[out:json][timeout:25];(nwr["shop"](around:${CFG.SCAN_R},${pos.lat},${pos.lng});nwr["amenity"~"^(pharmacy|fuel|restaurant|fast_food|cafe|bar|pub|hospital|clinic|doctors|dentist|veterinary|police|fire_station|school|library|townhall|post_office|place_of_worship|bank|community_centre)$"](around:${CFG.SCAN_R},${pos.lat},${pos.lng});nwr["craft"](around:${CFG.SCAN_R},${pos.lat},${pos.lng});way["building"](around:${CFG.SCAN_R},${pos.lat},${pos.lng}););out center tags;`;
+  const q=`[out:json][timeout:25];(nwr["shop"](around:${CFG.SCAN_R},${pos.lat},${pos.lng});nwr["amenity"~"^(pharmacy|fuel|restaurant|fast_food|cafe|bar|pub|hospital|clinic|doctors|dentist|veterinary|police|fire_station|school|library|townhall|post_office|place_of_worship|bank|community_centre)$"](around:${CFG.SCAN_R},${pos.lat},${pos.lng});nwr["craft"](around:${CFG.SCAN_R},${pos.lat},${pos.lng});way["building"](around:${CFG.SCAN_R},${pos.lat},${pos.lng});nwr["natural"~"^(wood|scrub|heath|bare_rock|scree|stone|cliff|rock|grassland)$"](around:${CFG.SCAN_R},${pos.lat},${pos.lng});nwr["landuse"~"^(forest|orchard|quarry|meadow|farmland)$"](around:${CFG.SCAN_R},${pos.lat},${pos.lng});nwr["leisure"="park"](around:${CFG.SCAN_R},${pos.lat},${pos.lng}););out center tags;`;
   let data=null;
   for(const url of OVERPASS){
     try{const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),30000);
@@ -305,13 +372,17 @@ async function scan(){
   }
   scanning=false;
   if(!data){scanFailAt=Date.now();if(sites.size<5){procSites();toast('Map data unavailable — generated ruins nearby.','#f2a03d');}return;}
-  const poi=[],houses=[];
+  const poi=[],houses=[],nat=[];
   for(const el of data.elements){
     const t=el.tags||{},lat=el.lat??el.center?.lat,lng=el.lon??el.center?.lon;if(lat==null)continue;
+    const nt=!t.building&&!t.shop&&!t.amenity&&natType(t);
+    if(nt){let c={lat,lng};const d=dist(pos,c);if(d>600){const R=mulberry(hashStr('n'+el.id)),k=(150+R()*300)/d;c={lat:pos.lat+(lat-pos.lat)*k,lng:pos.lng+(lng-pos.lng)*k};}
+      nat.push({id:'n'+el.type[0]+el.id,lat:c.lat,lng:c.lng,type:nt,n:nt==='tree'?5:nt==='rock'?3:3});continue;}
     const cat=classify(t);if(!cat)continue;
     const s={id:'osm'+el.type[0]+el.id,lat,lng,cat,name:siteName(t,cat)};s.d=dist(pos,s);
     (cat==='house'?houses:poi).push(s);
   }
+  const B=houses.length+poi.length;S.rural=B<40?1:B<120?.6:B<300?.3:.12;if(nat.length>4)S.rural=Math.max(S.rural,.45);natFeat=nat;refreshRes();
   const keep=houses.filter(h=>!poi.some(p=>dist(p,h)<15)).sort((a,b)=>a.d-b.d).slice(0,CFG.HOUSE_CAP);
   let added=0;for(const s of poi.concat(keep))if(!sites.has(s.id)){addSite(s);added++;}
   pruneSites();if(added)toast(`Scouted ${added} locations nearby.`);
@@ -461,8 +532,9 @@ function zTurn(){
   for(const z of alive()){
     if(z.stun){z.stun=0;continue;}
     const T=ZT[z.type];
-    if(Math.random()<T.hit){const d=ri(T.dmg[0],T.dmg[1]);p.hp-=d;elog(`${T.n} claws you for ${d}.`,'r');
-      if(!p.inf&&Math.random()<T.inf){p.inf=true;elog('🦠 You\'ve been bitten. Infected — find antibiotics.','r');}}
+    if(Math.random()<T.hit){const a=armorDef(),raw=ri(T.dmg[0],T.dmg[1]),d=Math.max(1,raw-a);p.hp-=d;
+      elog(`${T.n} claws you for ${d}${a?` (armor blocked ${raw-d})`:''}.`,'r');if(a)wear(S.armor);
+      if(!p.inf&&Math.random()<T.inf*(1-a*.07)){p.inf=true;elog('🦠 You\'ve been bitten. Infected — find antibiotics.','r');}}
     else elog(`${T.n} grabs at you and misses.`);
   }
 }
@@ -471,7 +543,7 @@ function checkDeath(){
   const lost=Object.keys(S.inv).length;
   for(const z of E?E.zs:[])if(z.hp<=0)killZombieMarker(z);
   if(IN){S.looted[IN.s.id]=Date.now();IN=null;$('#inside').classList.remove('open');}
-  E=null;S.inv={};S.wdur={};S.equip='fists';Object.assign(S.p,{hp:60,food:60,water:60,stam:100,inf:false});
+  E=null;S.inv={};S.wdur={};S.equip='fists';S.armor=null;Object.assign(S.p,{hp:60,food:60,water:60,stam:100,inf:false});
   for(const z of zombies.slice())if(dist(z,pos)<150)killZombieMarker(z);
   graceUntil=Date.now()+30000;save();
   modal(`<h2>☠️ You died</h2><p>You lost everything you were carrying (${lost} item types). Your base stash is safe.</p><p class="dim">You come to, weak but alive. The area has cleared — for now.</p><button class="pri" style="width:100%" onclick="closeModal()">Get up</button>`);
@@ -650,7 +722,7 @@ function bumpZombie(z){
   IN.path=null;
   if(!z.alert){
     const w=weapon();let d;
-    if(w.ammo&&S.inv[w.ammo]>0){remItem(w.ammo);d=ri(w.dmg[0],w.dmg[1])*2;for(const o of IN.zs)o.alert=true;}
+    if(w.ammo&&S.inv[w.ammo]>0){remItem(w.ammo);d=ri(w.dmg[0],w.dmg[1])*2;if(w.noise)for(const o of IN.zs)o.alert=true;}
     else d=(w.ammo?ri(3,6):ri(w.dmg[0],w.dmg[1]))*2;
     wear(S.equip);z.hp-=d;
     if(z.hp<=0){S.p.kills++;gainXp(ZT[z.type].xp);IN.zs=IN.zs.filter(o=>o!==z);inMsg(`🤫 Silent takedown — ${ZT[z.type].n} never woke up.`);inTurn();return;}
@@ -729,34 +801,125 @@ document.addEventListener('keydown',e=>{
 
 /* ================= SHEETS ================= */
 function openPack(){
-  const atBase=S.base&&pos&&dist(pos,S.base)<=CFG.BASE_R,order=['weapon','ammo','throw','heal','food','drink','mat'];
+  const ab=atBase(),order=['weapon','armor','ammo','throw','heal','food','drink','seed','mat'];
   const keys=Object.keys(S.inv).filter(k=>ITEMS[k]).sort((a,b)=>order.indexOf(ITEMS[a].t)-order.indexOf(ITEMS[b].t));
-  sheet(`<h2>🎒 Pack</h2><div class="dim sm">${invWeight().toFixed(1)} / ${cap()} kg ${overloaded()?'<b style="color:#ffd59e">· OVERLOADED</b>':''} · Equipped: ${weapon().icon} ${weapon().n}</div>
-  ${keys.map(k=>{const it=ITEMS[k],eq=S.equip===k;
-    const btn=it.t==='weapon'?(eq?`<button class="sm" onclick="S.equip='fists';openPack()">Unequip</button>`:`<button class="sm" onclick="S.equip='${k}';save();openPack()">Equip</button>`)
+  const ar=S.armor?ITEMS[S.armor]:null;
+  sheet(`<h2>🎒 Pack</h2><div class="dim sm">${invWeight().toFixed(1)} / ${cap()} kg ${overloaded()?'<b style="color:#ffd59e">· OVERLOADED</b>':''} · ${weapon().icon} ${weapon().n} · ${ar?ar.icon+' '+ar.n+' (armor '+ar.def+')':'No armor'}</div>
+  ${keys.map(k=>{const it=ITEMS[k],eq=S.equip===k||S.armor===k;
+    const btn=it.t==='weapon'?(eq?`<button class="sm" onclick="S.equip='fists';save();openPack()">Unequip</button>`:`<button class="sm" onclick="S.equip='${k}';save();openPack()">Equip</button>`)
+      :it.t==='armor'?(eq?`<button class="sm" onclick="S.armor=null;save();openPack()">Remove</button>`:`<button class="sm" onclick="S.armor='${k}';save();openPack()">Wear</button>`)
       :['heal','food','drink'].includes(it.t)?`<button class="sm" onclick="useItem('${k}');save();openPack()">Use</button>`:'';
-    return `<div class="row"><span class="ic">${it.icon}</span><span class="nm">${it.n} ×${S.inv[k]}${eq?' ★':''}${it.t==='weapon'?`<br><span class="dim sm">dmg ${it.dmg.join('–')} · dur ${durOf(k)}/${it.dur}${it.ammo?' · uses '+ITEMS[it.ammo].n:''}</span>`:''}</span>${btn}
-    ${atBase?`<button class="sm" onclick="stash('${k}')">Stash</button>`:''}<button class="sm" onclick="remItem('${k}');save();openPack()">Drop</button></div>`;}).join('')||'<p class="dim">Empty.</p>'}`);
+    const info=it.t==='weapon'?`dmg ${it.dmg.join('–')} · dur ${durOf(k)}/${it.dur}${it.ammo?' · uses '+ITEMS[it.ammo].n:''}${it.tool?' · '+(it.tool==='chop'?'chops wood':'mines stone'):''}`:it.t==='armor'?`blocks ${it.def} per hit · dur ${durOf(k)}/${it.dur}`:'';
+    return `<div class="row"><span class="ic">${it.icon}</span><span class="nm">${it.n} ×${S.inv[k]}${eq?' ★':''}${info?`<br><span class="dim sm">${info}</span>`:''}</span>${btn}
+    ${ab?`<button class="sm" onclick="stash('${k}')">Stash</button>`:''}<button class="sm" onclick="remItem('${k}');save();openPack()">Drop</button></div>`;}).join('')||'<p class="dim">Empty.</p>'}`);
 }
+/* ---- base economy helpers ---- */
+const atBase=()=>!!(S.base&&pos&&!IN&&dist(pos,S.base)<=CFG.BASE_R);
+const have=k=>(S.inv[k]||0)+(atBase()?(S.stash[k]||0):0);
+const canPay=c=>Object.entries(c).every(([k,q])=>have(k)>=q);
+function pay(c){for(const[k,q]of Object.entries(c)){const a=Math.min(q,S.inv[k]||0);if(a)remItem(k,a);if(q-a>0)remItem(k,q-a,S.stash);}}
+const costHtml=c=>Object.entries(c).map(([k,q])=>`${ITEMS[k].icon}${q}<span style="color:${have(k)>=q?'#5cc98a':'#ff8a8d'}">(${have(k)})</span>`).join(' ');
+function statLine(k){const it=ITEMS[k];if(it.t==='weapon')return` <span class="dim sm">· dmg ${it.dmg.join('–')}${it.tool?' · tool':''}${it.noise===0?' · silent':''}</span>`;if(it.t==='armor')return` <span class="dim sm">· armor ${it.def}</span>`;
+  const f=[];if(it.food)f.push('+'+it.food+' food');if(it.water)f.push('+'+it.water+' water');if(it.hp)f.push('+'+it.hp+' hp');if(it.stam)f.push('+'+it.stam+' stam');if(it.cure)f.push('cures infection');return f.length?` <span class="dim sm">· ${f.join(', ')}</span>`:'';}
 function openCraft(){
-  const has=r=>Object.entries(r.need).every(([k,q])=>(S.inv[k]||0)>=q);
-  sheet(`<h2>🛠️ Craft</h2>${RECIPES.map((r,i)=>`<div class="row"><span class="ic">${ITEMS[r.out].icon}</span><span class="nm">${ITEMS[r.out].n}${r.q>1?' ×'+r.q:''}<br><span class="dim sm">${Object.entries(r.need).map(([k,q])=>`${ITEMS[k].icon}${q} <span style="color:${(S.inv[k]||0)>=q?'#5cc98a':'#ff8a8d'}">(${S.inv[k]||0})</span>`).join('  ')}</span></span><button class="sm" ${has(r)?'':'disabled'} onclick="craft(${i})">Make</button></div>`).join('')}`);
+  const ab=atBase();let html='<h2>🛠️ Craft</h2>'+(ab?'<div class="dim sm">At base — stashed materials count.</div>':'');
+  for(const g of ['','workbench','oven','forge','apothecary']){
+    const st=STATIONS[g];let lock='';
+    if(g){if(!S.st[g])lock=`🔒 Build a ${st.n} at your base to unlock.`;else if(!ab)lock='Return to base to use the '+st.n+'.';}
+    html+=`<h3>${g?st.icon+' '+st.n:'🎒 Anywhere'}</h3>${lock?`<div class="dim sm">${lock}</div>`:''}`;
+    html+=RECIPES.map((r,i)=>[r,i]).filter(([r])=>(r.st||'')===g).map(([r,i])=>`<div class="row"><span class="ic">${ITEMS[r.out].icon}</span><span class="nm">${ITEMS[r.out].n}${r.q>1?' ×'+r.q:''}${statLine(r.out)}<br><span class="sm">${costHtml(r.need)}</span></span><button class="sm" ${!lock&&canPay(r.need)?'':'disabled'} onclick="craft(${i})">Make</button></div>`).join('');
+  }
+  sheet(html);
 }
-function craft(i){const r=RECIPES[i];for(const[k,q]of Object.entries(r.need))remItem(k,q);addItem(r.out,r.q);save();toast(`Crafted ${ITEMS[r.out].n}.`);openCraft();}
-function openBase(){
+function craft(i){const r=RECIPES[i];if(r.st&&(!S.st[r.st]||!atBase()))return;if(!canPay(r.need))return;pay(r.need);addItem(r.out,r.q);save();toast(`Crafted ${ITEMS[r.out].n}${r.q>1?' ×'+r.q:''}.`);openCraft();}
+function rainTick(){if(!S.st.rainbarrel)return;const n=Math.floor((Date.now()-S.rain.t)/1800000);if(n>0){S.rain.n=Math.min(5,S.rain.n+n);S.rain.t=S.rain.n>=5?Date.now():S.rain.t+n*1800000;}}
+const plotReady=p=>!!p&&Date.now()>=p.t0+p.dur;
+let baseTab='home';
+function openBase(tab){
+  if(typeof tab==='string')baseTab=tab;
   if(!pos){toast('Waiting for location…');return;}
-  const d=S.base?dist(pos,S.base):null,here=d!=null&&d<=CFG.BASE_R;
-  sheet(`<h2>🏚️ Safehouse</h2>${!S.base?`<p class="dim">No base yet. Set one where you are — home is a good choice. Zombies can't get within ${CFG.BASE_R} m, you heal there, and your stash survives death.</p><button class="pri" onclick="setBase()">Set base here</button>`
-   :`<div class="dim">${here?'You are at your base. Resting heals you (needs food & water above 20).':'Base is '+fm(d)+' away.'}</div>
-   <h3>Stash (${invWeight(S.stash).toFixed(1)} kg)</h3>${Object.keys(S.stash).map(k=>`<div class="row"><span class="ic">${ITEMS[k].icon}</span><span class="nm">${ITEMS[k].n} ×${S.stash[k]}</span>${here?`<button class="sm" onclick="unstash('${k}')">Take 1</button><button class="sm" onclick="unstash('${k}',true)">All</button>`:''}</div>`).join('')||'<p class="dim">Empty.</p>'}
-   ${here?`<button style="margin-top:8px" onclick="stashAll()">Stash all materials</button>`:''}
-   <div style="margin-top:14px"><button class="sm" id="mvb" onclick="this.id==='mvb2'?setBase():(this.id='mvb2',this.textContent='Tap again to confirm move')">Move base here</button></div>`}`);
+  if(!S.base){sheet(`<h2>🏚️ Safehouse</h2><p class="dim">No base yet. Set one where you are — home is a good choice. Zombies can't get within ${CFG.BASE_R} m, you heal there, your stash survives death, and you can build a farm and workshops.</p><button class="pri" onclick="setBase()">Set base here</button>`);return;}
+  rainTick();const d=dist(pos,S.base),here=atBase();
+  const tabs=`<div style="display:flex;gap:6px;margin:8px 0">${[['home','🏚️ Stash'],['build','🔨 Build'],['farm','🌾 Farm']].map(([k,l])=>`<button class="sm ${baseTab===k?'pri':''}" onclick="openBase('${k}')">${l}</button>`).join('')}</div>`;
+  let body='';
+  if(baseTab==='home'){
+    body=(S.st.rainbarrel?`<div class="row"><span class="ic">🛢️</span><span class="nm">Rain Barrel: ${S.rain.n}/5 💧</span>${here&&S.rain.n?'<button class="sm" onclick="collectRain()">Collect</button>':''}</div>`:'')+
+    `<h3>Stash (${invWeight(S.stash).toFixed(1)} kg)</h3>${Object.keys(S.stash).filter(k=>ITEMS[k]).map(k=>`<div class="row"><span class="ic">${ITEMS[k].icon}</span><span class="nm">${ITEMS[k].n} ×${S.stash[k]}</span>${here?`<button class="sm" onclick="unstash('${k}')">Take 1</button><button class="sm" onclick="unstash('${k}',true)">All</button>`:''}</div>`).join('')||'<p class="dim">Empty.</p>'}
+    ${here?'<button style="margin-top:8px" onclick="stashAll()">Stash all materials & seeds</button>':''}
+    <div style="margin-top:14px"><button class="sm" id="mvb" onclick="this.id==='mvb2'?setBase():(this.id='mvb2',this.textContent='Tap again — stations & farm move too')">Move base here</button></div>`;
+  }else if(baseTab==='build'){
+    body=Object.entries(STATIONS).map(([k,s])=>{const built=S.st[k],lock=s.req&&!S.st[s.req];
+      return `<div class="row"><span class="ic">${s.icon}</span><span class="nm"><b>${s.n}</b>${built?' ✅':''}<br><span class="dim sm">${s.desc}</span>${built?'':`<br><span class="sm">${lock?'🔒 Requires '+STATIONS[s.req].n:costHtml(s.cost)}</span>`}</span>${built?'':`<button class="sm" ${here&&!lock&&canPay(s.cost)?'':'disabled'} onclick="buildSt('${k}')">Build</button>`}</div>`;}).join('')+
+    `<div class="row"><span class="ic">🟫</span><span class="nm"><b>Farm Plot</b> (${S.plots.length}/${MAX_PLOTS})<br><span class="dim sm">Grow potatoes, corn, wheat, herbs. Grows while you're away.</span><br><span class="sm">${costHtml(PLOT_COST)}</span></span><button class="sm" ${here&&S.plots.length<MAX_PLOTS&&canPay(PLOT_COST)?'':'disabled'} onclick="buildPlot()">Build</button></div>`+
+    (here?'':'<p class="dim sm">Build at your base. Wood and stone come from 🌲 trees and 🪨 rocks — common in rural areas.</p>');
+  }else{
+    body=!S.plots.length?'<p class="dim">No plots yet — build some in the Build tab.</p>':S.plots.map((p,i)=>{
+      if(!p){const seeds=Object.keys(CROPS).filter(c=>have(CROPS[c].seed)>0);
+        return `<div class="row"><span class="ic">🟫</span><span class="nm">Plot ${i+1}: empty<br><span class="dim sm">Plant = 1 seed + 💧1</span></span>${here?(seeds.map(c=>`<button class="sm" ${have('water')?'':'disabled'} onclick="plant(${i},'${c}')">${ITEMS[CROPS[c].out].icon} ${CROPS[c].n}</button>`).join(' ')||'<span class="dim sm">No seeds</span>'):''}</div>`;}
+      const C=CROPS[p.crop],pct=clamp((Date.now()-p.t0)/p.dur,0,1),ready=pct>=1;
+      return `<div class="row"><span class="ic">${ready?ITEMS[C.out].icon:'🌱'}</span><span class="nm">Plot ${i+1}: ${C.n} ${ready?'<b style="color:#5cc98a">ready!</b>':Math.floor(pct*100)+'% · ~'+Math.ceil((p.t0+p.dur-Date.now())/60000)+' min'}<div class="prog" style="margin:4px 0 0"><i style="width:${pct*100}%;transition:none"></i></div></span>${ready&&here?`<button class="sm pri" onclick="harvestPlot(${i})">Harvest</button>`:''}</div>`;}).join('')+
+      (here?(S.plots.some(plotReady)?'<button class="pri" style="margin-top:8px;width:100%" onclick="harvestAll()">Harvest all</button>':''):'<p class="dim sm">Go home to plant and harvest.</p>')+
+      `<h3>Crops</h3><div class="sm dim">${Object.values(CROPS).map(c=>`${ITEMS[c.out].icon} ${c.n}: ${c.min/60} h → ${c.q[0]}–${c.q[1]}`).join(' · ')}. Usually returns seeds. Seeds come from houses, groceries, hardware stores and wild herbs.</div>`;
+  }
+  sheet(`<h2>🏚️ Safehouse</h2><div class="dim sm">${here?'You are home. Resting heals you. Crafting & building here can use your stash.':'Base is '+fm(d)+' away.'}</div>${tabs}${body}`);
 }
-function setBase(){S.base={...pos};drawBase();save();toast('Safehouse established.','#8fd14f');openBase();}
-function drawBase(){if(!S.base)return;if(baseMk){baseMk.setLatLng(S.base);baseRing.setLatLng(S.base);}else{baseMk=L.marker(S.base,{icon:icon('base','🏚️')}).addTo(map).on('click',openBase);baseRing=L.circle(S.base,{radius:CFG.BASE_R,color:'#8fd14f',weight:1,fillOpacity:.06}).addTo(map);}}
-function stash(k){const q=S.inv[k];if(S.equip===k)S.equip='fists';addItem(k,q,S.stash);remItem(k,q);save();openPack();}
-function unstash(k,all){const q=all?S.stash[k]:1;addItem(k,q);remItem(k,q,S.stash);save();openBase();}
-function stashAll(){for(const k of Object.keys(S.inv))if(ITEMS[k].t==='mat'){addItem(k,S.inv[k],S.stash);remItem(k,S.inv[k]);}save();openBase();}
+function buildSt(k){const s=STATIONS[k];if(!atBase()||S.st[k]||(s.req&&!S.st[s.req])||!canPay(s.cost))return;pay(s.cost);S.st[k]=true;if(k==='rainbarrel')S.rain={n:0,t:Date.now()};gainXp(15);save();toast(`${s.icon} ${s.n} built.`,'#8fd14f');openBase('build');}
+function buildPlot(){if(!atBase()||S.plots.length>=MAX_PLOTS||!canPay(PLOT_COST))return;pay(PLOT_COST);S.plots.push(null);gainXp(5);save();toast('🟫 Farm plot built.','#8fd14f');openBase('build');}
+function plant(i,c){const C=CROPS[c];if(!atBase()||S.plots[i]||!canPay({[C.seed]:1,water:1}))return;pay({[C.seed]:1,water:1});S.plots[i]={crop:c,t0:Date.now(),dur:C.min*60000/(demo?20:1)};save();toast(`Planted ${C.n}.`);openBase('farm');}
+function harvestPlot(i,quiet){const p=S.plots[i];if(!atBase()||!plotReady(p))return;const C=CROPS[p.crop],q=ri(C.q[0],C.q[1]);let sd=Math.random()<.7?1:0;if(Math.random()<.25)sd++;
+  addItem(C.out,q);if(sd)addItem(C.seed,sd);S.plots[i]=null;gainXp(4);save();if(!quiet){toast(`Harvested ${ITEMS[C.out].icon} ${C.n} ×${q}${sd?` + ${sd} seed${sd>1?'s':''}`:''}.`,'#5cc98a');openBase('farm');}return[C.out,q];}
+function harvestAll(){const got={};S.plots.forEach((p,i)=>{if(plotReady(p)){const[k,q]=harvestPlot(i,true);got[k]=(got[k]||0)+q;}});toast('Harvested '+Object.entries(got).map(([k,q])=>ITEMS[k].icon+'×'+q).join(' '),'#5cc98a');openBase('farm');}
+function collectRain(){if(!atBase())return;rainTick();addItem('water',S.rain.n);toast(`Collected 💧×${S.rain.n}.`);S.rain.n=0;S.rain.t=Date.now();save();openBase('home');}
+function setBase(){S.base={...pos};drawBase();save();toast('Safehouse established.','#8fd14f');openBase('home');}
+function drawBase(){if(!S.base)return;if(baseMk){baseMk.setLatLng(S.base);baseRing.setLatLng(S.base);}else{baseMk=L.marker(S.base,{icon:icon('base','🏚️')}).addTo(map).on('click',()=>openBase());baseRing=L.circle(S.base,{radius:CFG.BASE_R,color:'#8fd14f',weight:1,fillOpacity:.06}).addTo(map);}}
+function stash(k){const q=S.inv[k];if(S.equip===k)S.equip='fists';if(S.armor===k)S.armor=null;addItem(k,q,S.stash);remItem(k,q);save();openPack();}
+function unstash(k,all){const q=all?S.stash[k]:1;addItem(k,q);remItem(k,q,S.stash);save();openBase('home');}
+function stashAll(){for(const k of Object.keys(S.inv))if(['mat','seed'].includes(ITEMS[k].t)){addItem(k,S.inv[k],S.stash);remItem(k,S.inv[k]);}save();openBase('home');}
+
+/* ================= RESOURCES (trees / rocks / herbs) ================= */
+const RES_R=35,RES_CD=60;
+let resNodes=new Map(),natFeat=[],lastRes=null,harvesting=null;
+function natType(t){const n=t.natural,l=t.landuse;
+  if(['wood','scrub','heath'].includes(n)||['forest','orchard'].includes(l)||t.leisure==='park')return'tree';
+  if(['bare_rock','scree','stone','cliff','rock'].includes(n)||l==='quarry')return'rock';
+  if(n==='grassland'||['meadow','farmland'].includes(l))return'herb';return null;}
+const resLeft=n=>{const t=S.harv[n.id];if(!t)return 0;const l=t+RES_CD*60000-Date.now();if(l<=0){delete S.harv[n.id];return 0;}return l;};
+function resIcon(n){const inr=pos&&dist(pos,n)<=RES_R;return icon('site res'+(resLeft(n)?' looted':'')+(inr?' inr':''),RES[n.type].icon,26);}
+function refreshRes(){
+  if(!pos)return;lastRes={...pos};const want=new Map(),CL=.0015,CG=.002,cx0=Math.floor(pos.lat/CL),cy0=Math.floor(pos.lng/CG),rural=S.rural;
+  for(let i=-2;i<=2;i++)for(let j=-2;j<=2;j++){const cx=cx0+i,cy=cy0+j,R=mulberry(hashStr('cell'+cx+'_'+cy));
+    for(let k=0;k<3;k++){const v=R(),la=(cx+R())*CL,ln=(cy+R())*CG,ty=R();if(v>rural*.85)continue;
+      want.set(`c${cx}_${cy}_${k}`,{lat:la,lng:ln,type:ty<.55?'tree':ty<.83?'rock':'herb'});}}
+  for(const f of natFeat){if(dist(pos,f)>700)continue;const R=mulberry(hashStr(f.id));
+    for(let k=0;k<f.n;k++){const a=R()*6.283,r=10+R()*45,p=offset(f,Math.cos(a)*r,Math.sin(a)*r),h=R()<.25;want.set(f.id+'_'+k,{...p,type:h?'herb':f.type});}}
+  for(const[id,n]of resNodes)if(!want.has(id)){map.removeLayer(n.mk);resNodes.delete(id);}
+  for(const[id,n]of want)if(!resNodes.has(id)){n.id=id;n.mk=L.marker(n,{icon:resIcon(n),zIndexOffset:-200}).addTo(map).on('click',()=>openRes(n));resNodes.set(id,n);}
+}
+function openRes(n){
+  const T=RES[n.type];
+  const render=()=>{const d=pos?dist(pos,n):Infinity,left=resLeft(n);let act;
+    if(harvesting===n)act='<div class="prog"><i id="pg"></i></div><div class="dim sm">Working…</div>';
+    else if(left)act=`<div class="dim">Gathered recently. Regrows in ${Math.ceil(left/60000)} min.</div>`;
+    else if(d>RES_R)act=`<button disabled>Get within ${RES_R} m</button>`;
+    else act=`<button class="pri" onclick="harvest('${n.id}')">${T.verb}</button>`;
+    const tip=n.type==='tree'?(hasTool('chop')?'Axe in pack: +2 wood.':'Carry an axe for +2 wood.'):n.type==='rock'?(hasTool('mine')?'Pickaxe: +1 stone, better ore odds.':'A pickaxe gives more stone and better iron ore odds.'):'Herbs for medicine. Chance of seeds.';
+    return `<h2>${T.icon} ${T.n}</h2><div class="dim">${fm(d)} away · ${tip}</div><div style="margin-top:12px">${act}</div>`;};
+  sheet(render(),()=>{if(harvesting!==n)$('#sheet').innerHTML='<button class="x" onclick="closeSheet()">✕</button>'+render();});
+}
+function harvest(id){
+  const n=resNodes.get(id);if(!n||harvesting||E||IN||searching)return;harvesting=n;openRes(n);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{const pg=$('#pg');if(pg)pg.style.width='100%';}));
+  setTimeout(()=>{
+    harvesting=null;if(!pos||dist(pos,n)>RES_R+15){toast('You wandered off.');return;}
+    const got={},add=(k,q)=>{if(q>0)got[k]=(got[k]||0)+q;};
+    if(n.type==='tree'){const t=hasTool('chop');add('wood',ri(1,2)+(t?2:0));if(t)wear(t);}
+    else if(n.type==='rock'){const t=hasTool('mine');add('stone',ri(1,3)+(t?1:0));if(Math.random()<(t?.45:.2))add('ore',1);if(t)wear(t);}
+    else{add('herbs',ri(1,2));if(Math.random()<.3)add('s_herb',1);if(Math.random()<.12)add(['s_potato','s_corn','s_wheat'][ri(0,2)],1);}
+    for(const[k,q]of Object.entries(got))addItem(k,q);S.harv[n.id]=Date.now();gainXp(2);n.mk.setIcon(resIcon(n));save();
+    toast('Gathered '+Object.entries(got).map(([k,q])=>ITEMS[k].icon+' '+ITEMS[k].n+' ×'+q).join(', '));openRes(n);
+    if(Math.random()<.07){const a=rnd(0,6.283);spawnZombie(offset(pos,Math.cos(a)*35,Math.sin(a)*35));toast('The noise drew something out…','#e5484d');}
+  },3000);
+}
 function openLog(){sheet(`<h2>📜 Log</h2>${LOG.map(l=>`<div class="row sm">${esc(l)}</div>`).join('')||'<p class="dim">Nothing yet.</p>'}`);}
 function openSettings(){
   const p=S.p;
@@ -766,7 +929,7 @@ function openSettings(){
   <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${demo?'<button class="sm" onclick="closeSheet();startGPS(true)">Switch to GPS</button>':'<button class="sm" onclick="closeSheet();startDemo(true)">Switch to demo</button>'}
   <button class="sm" onclick="lastScan=null;toast('Rescanning…');scan()">Rescan area</button></div>
   <h3>Danger zone</h3><button class="sm dng" id="rs" onclick="this.id==='rs2'?(localStorage.removeItem('${CFG.SAVE}'),location.reload()):(this.id='rs2',this.textContent='Tap again — wipes everything')">Reset save</button>
-  <h3>How it works</h3><div class="sm dim">Walk within ${CFG.SCAV_RANGE} m of a location to search it; it restocks after ${CFG.COOLDOWN_MIN} min. Zombies chase you once they notice you — walkers are slower than you, runners aren't. Tap a zombie within ${CFG.MELEE_RANGE} m (${CFG.GUN_RANGE} m with a loaded gun) to strike first. Gunfire draws more. Food and water drain while you play; at zero you lose health. Map data © OpenStreetMap contributors.</div>`);
+  <h3>How it works</h3><div class="sm dim">Walk within ${CFG.SCAV_RANGE} m of a location to search it; it restocks after ${CFG.COOLDOWN_MIN} min. Zombies chase you once they notice you — walkers are slower than you, runners aren't. Tap a zombie within ${CFG.MELEE_RANGE} m (${CFG.GUN_RANGE} m with a loaded gun) to strike first. Gunfire draws more. Food and water drain while you play; at zero you lose health. Rural areas have 🌲 trees, 🪨 rocks and 🌿 herbs to gather. At your base, build a workbench, oven, forge, apothecary, rain barrel and farm plots — crops grow in real time while you're away. Map data © OpenStreetMap contributors.</div>`);
 }
 function recenter(){follow=true;if(pos)map.setView(pos,Math.max(map.getZoom(),17));}
 
@@ -810,6 +973,9 @@ function hud(){
   const c=[`<span class="chip">Lv ${p.lvl}</span>`,`<span class="chip">${weapon().icon} ${weapon().n}${weapon().ammo?' ('+(S.inv[weapon().ammo]||0)+')':''}</span>`,`<span class="chip">🧟 ${zombies.length}</span>`];
   if(demo)c.push('<span class="chip y">DEMO</span>');
   if(isNight())c.push('<span class="chip y">🌙 Night — more dead</span>');
+  if(S.armor)c.push(`<span class="chip">${ITEMS[S.armor].icon} ${armorDef()}</span>`);
+  {const rd=S.plots.filter(plotReady).length;if(rd)c.push(`<span class="chip g">🌾 ${rd} ready</span>`);}
+  if(S.rural>=.6)c.push('<span class="chip g">🌲 Rural</span>');
   if(p.inf)c.push('<span class="chip r">🦠 Infected</span>');
   if(p.food<=0||p.water<=0)c.push('<span class="chip r">Starving</span>');
   if(overloaded())c.push('<span class="chip y">🎒 Overloaded</span>');
@@ -834,7 +1000,9 @@ setInterval(()=>{
     if(IN){drawIn();hud();return;}
     if(!tooFast())zombieTick(now);
     if(!lastScan||(dist(pos,lastScan)>CFG.RESCAN_D&&now-scanFailAt>60000))scan();
-    if(++siteIconTick%3===0)for(const s of sites.values()){const ic=siteIcon(s),k=ic.options.html;if(s._k!==k){s._k=k;s.mk.setIcon(ic);}}
+    if(!lastRes||dist(pos,lastRes)>120)refreshRes();
+    if(++siteIconTick%3===0){for(const s of sites.values()){const ic=siteIcon(s),k=ic.options.html;if(s._k!==k){s._k=k;s.mk.setIcon(ic);}}
+      for(const n of resNodes.values()){const ic=resIcon(n),k=ic.options.html;if(n._k!==k){n._k=k;n.mk.setIcon(ic);}}}
     if(curSheet)curSheet();
   }
   hud();if(++saveTick%10===0)save();
