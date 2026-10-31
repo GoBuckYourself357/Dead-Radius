@@ -296,7 +296,7 @@ const CROPS={
  wheat:{n:'Wheat',seed:'s_wheat',out:'wheat',q:[3,5],min:150},
  herb:{n:'Herbs',seed:'s_herb',out:'herbs',q:[2,4],min:90},
 };
-const RES={tree:{icon:'🌲',n:'Trees',verb:'🪓 Chop wood'},rock:{icon:'🪨',n:'Rock Outcrop',verb:'⛏️ Mine stone'},herb:{icon:'🌿',n:'Wild Herbs',verb:'🤲 Forage'}};
+const RES={tree:{icon:'🌲',n:'Trees',verb:'🪓 Chop wood'},rock:{icon:'🪨',n:'Rock Outcrop',verb:'⛏️ Mine stone'},herb:{icon:'🌿',n:'Wild Herbs',verb:'🤲 Forage'},rubble:{icon:'🧱',n:'Rubble Pile',verb:'🔨 Salvage'}};
 
 /* ================= HELPERS ================= */
 const $=s=>document.querySelector(s);
@@ -315,7 +315,8 @@ function fresh(){return{p:{hp:100,maxHp:100,food:80,water:80,stam:100,inf:false,
   inv:{water:1,snack:1,bandage:1},wdur:{},equip:'fists',base:null,stash:{},looted:{},demoPos:null};}
 let S;try{S=JSON.parse(localStorage.getItem(CFG.SAVE));}catch(e){}
 if(!S||!S.p)S=fresh();
-S.st=S.st||{};S.plots=S.plots||[];S.rain=S.rain||{n:0,t:Date.now()};S.harv=S.harv||{};S.armor=S.armor||null;S.def=S.def||{wall:0,traps:0,tower:0};S.horde=S.horde||{next:null,wave:1,wall:0};S.wlvl=S.wlvl||{};S.sup=S.sup||0;S.choreDone=S.choreDone||{};S.animals=S.animals||[];S.lead=S.lead||[];S.feed=S.feed||0;S.mapMode=S.mapMode||'real';if(S.rural==null)S.rural=.5;
+S.st=S.st||{};S.plots=S.plots||[];S.rain=S.rain||{n:0,t:Date.now()};S.harv=S.harv||{};S.armor=S.armor||null;S.def=S.def||{wall:0,traps:0,tower:0};S.horde=S.horde||{next:null,wave:1,wall:0};S.wlvl=S.wlvl||{};S.sup=S.sup||0;S.choreDone=S.choreDone||{};S.animals=S.animals||[];S.lead=S.lead||[];S.feed=S.feed||0;S.mapMode=S.mapMode||'real';S.camps=S.camps||[];
+try{for(const k of Object.keys(localStorage))if(k.startsWith('drscan2_'))localStorage.removeItem(k);}catch(e){}if(S.rural==null)S.rural=.5;
 for(const k in S.harv)if(Date.now()-S.harv[k]>7200000)delete S.harv[k];
 function save(){try{localStorage.setItem(CFG.SAVE,JSON.stringify(S));}catch(e){}}
 
@@ -435,7 +436,7 @@ async function overpassBB(body){
   if(j&&j.elements.length&&!j.elements.some(elPos))j=await overpass(`[out:json][timeout:25];(${body});out tags center;`);
   return j;
 }
-const scanKey=p=>'drscan2_'+Math.round(p.lat*200)+'_'+Math.round(p.lng*200);
+const scanKey=p=>'drscan3_'+Math.round(p.lat*200)+'_'+Math.round(p.lng*200);
 async function scan(force){
   if(scanning||!pos)return;scanning=true;lastScan={...pos};const here={...pos},key=scanKey(here),A=`(around:${CFG.SCAN_R},${here.lat},${here.lng})`;
   let cached=null;try{cached=JSON.parse(localStorage.getItem(key));}catch(e){}
@@ -457,6 +458,7 @@ async function scan(force){
     if(cat==='store'&&t.name&&/lumber|building supply/i.test(t.name))cat='hardware';
     pois.push({id:'osm'+el.type[0]+el.id,lat:p.lat,lng:p.lng,cat,name:siteName(t,cat)});
   }
+  {const kept=[];for(const p of pois.sort((a,b)=>dist(here,a)-dist(here,b)))if(!kept.some(k=>k.cat===p.cat&&dist(k,p)<35))kept.push(p);pois.length=0;pois.push(...kept);}
   applyScan({pois,nat,zones,bld:[],raw:null},here,'partial');
   scanStatus='loading buildings…';
   const j2=await overpassBB(`way["building"]${A};`);
@@ -466,11 +468,14 @@ async function scan(force){
     raw=j2.elements.length;const ids=new Set(pois.map(p=>p.id)),cand=[];
     for(const el of j2.elements){const id='osm'+el.type[0]+el.id;if(ids.has(id))continue;const t=el.tags||{},p=elPos(el);if(!p)continue;
       const cat=classifyBuilding(t,elArea(el),p,zones);if(!cat)continue;cand.push({id,lat:p.lat,lng:p.lng,cat,name:siteName(t,cat),d:dist(here,p)});}
-    // thin: ~1 searchable building per 55 m block, prefer commercial/apartments over houses; skip ones next to a business
-    const pri={industrial:3,store:3,hardware:3,apartment:2,civic:2,barn:2,cabin:2,house:1},cells=new Map();
-    for(const c of cand){if(pois.some(p=>dist(p,c)<20))continue;const k=Math.floor(c.lat/.0005)+'_'+Math.floor(c.lng/.00068),o=cells.get(k);
-      if(!o||(pri[c.cat]||1)>(pri[o.cat]||1)||((pri[c.cat]||1)===(pri[o.cat]||1)&&c.d<o.d))cells.set(k,c);}
-    bld=[...cells.values()].sort((a,b)=>a.d-b.d).slice(0,140).map(({d,...c})=>c);
+    // thin: non-houses ~1 per 65 m block; houses ~1 per 110 m block and mostly only where no other building was picked
+    const pri={industrial:3,store:3,hardware:3,apartment:2,civic:2,barn:2,cabin:2},oth=new Map(),hs=new Map(),bigK=c=>Math.floor(c.lat/.001)+'_'+Math.floor(c.lng/.00136);
+    for(const c of cand){if(pois.some(p=>dist(p,c)<30))continue;
+      if(c.cat==='house'){const k=bigK(c),o=hs.get(k);if(!o||c.d<o.d)hs.set(k,c);continue;}
+      const k=Math.floor(c.lat/.0006)+'_'+Math.floor(c.lng/.0008),o=oth.get(k);if(!o||(pri[c.cat]||1)>(pri[o.cat]||1)||((pri[c.cat]||1)===(pri[o.cat]||1)&&c.d<o.d))oth.set(k,c);}
+    const others=[...oth.values()].sort((a,b)=>a.d-b.d).slice(0,45),taken=new Set(others.map(bigK));
+    const houses=[...hs.values()].filter(h=>!taken.has(bigK(h))||hashStr(h.id)%4===0).sort((a,b)=>a.d-b.d).slice(0,30);
+    bld=others.concat(houses).map(({d,...c})=>c);
   }
   const res={t:Date.now(),pois,nat,zones:[],bld,raw};
   if(j2){try{localStorage.setItem(key,JSON.stringify(res));const idx=JSON.parse(localStorage.getItem('drscan_idx')||'[]').filter(k=>k!==key);idx.push(key);
@@ -567,15 +572,18 @@ function zombieTick(now){
   const atBase=S.base&&dist(pos,S.base)<=CFG.BASE_R;
   for(const z of zombies.slice()){
     const d=dist(z,pos);if(d>450){killZombieMarker(z);continue;}
+    {const safe=[...S.camps.map(c=>[c,CAMP_R]),...(S.base?[[S.base,CFG.BASE_R]]:[])].find(([c,r])=>dist(z,c)<r);
+     if(safe){const[c,r]=safe,dl=delta(c,z),L=Math.hypot(dl.dx,dl.dy)||1,np=offset(c,dl.dx/L*(r+12),dl.dy/L*(r+12));z.lat=np.lat;z.lng=np.lng;z.mk.setLatLng(np);continue;}}
     const T=ZT[z.type];if(now<z.stunUntil)continue;
     let np;
     if(d<T.aggro*(night?1.3:1)&&now>graceUntil)np=stepToward(z,pos,Math.min(T.spd,Math.max(0,d-2)));
     else{z.wb+=rnd(-.5,.5);np=offset(z,Math.cos(z.wb)*.35,Math.sin(z.wb)*.35);}
     if(S.base&&dist(np,S.base)<CFG.BASE_R+10)continue;
+    if(S.camps.some(c=>dist(np,c)<CAMP_R+8))continue;
     z.lat=np.lat;z.lng=np.lng;z.mk.setLatLng(np);
   }
   z_stunCls(now);
-  if(!atBase&&now>graceUntil){const near=zombies.filter(z=>now>=z.stunUntil&&dist(z,pos)<=CFG.ENGAGE);
+  if(!atBase&&!nearCamp()&&now>graceUntil){const near=zombies.filter(z=>now>=z.stunUntil&&dist(z,pos)<=CFG.ENGAGE);
     if(near.length){closeSheet();startEncounter(zombies.filter(z=>dist(z,pos)<=25),false);}}
 }
 function z_stunCls(now){for(const z of zombies){const st=now<z.stunUntil;if(st!==z._st){z._st=st;z.mk.setIcon(icon('zmb '+z.type+(st?' stun':''),ZT[z.type].icon,36));}}}
@@ -922,7 +930,7 @@ document.addEventListener('keydown',e=>{
 
 /* ================= SHEETS ================= */
 function openPack(){
-  const ab=atBase(),order=['weapon','armor','ammo','throw','heal','food','drink','seed','mat'];
+  const ab=atBase(),cp=nearCamp(),order=['weapon','armor','ammo','throw','heal','food','drink','seed','mat'];
   const keys=Object.keys(S.inv).filter(k=>ITEMS[k]).sort((a,b)=>order.indexOf(ITEMS[a].t)-order.indexOf(ITEMS[b].t));
   const ar=S.armor?ITEMS[S.armor]:null;
   sheet(`<h2>🎒 Pack</h2><div class="dim sm">${invWeight().toFixed(1)} / ${cap()} kg ${overloaded()?'<b style="color:#ffd59e">· OVERLOADED</b>':''} · ${weapon().icon} ${weapon().n} · ${ar?ar.icon+' '+ar.n+' (armor '+ar.def+')':'No armor'}</div>
@@ -932,21 +940,22 @@ function openPack(){
       :['heal','food','drink'].includes(it.t)?`<button class="sm" onclick="useItem('${k}');save();openPack()">Use</button>`:'';
     const info=it.t==='weapon'?`dmg ${it.dmg.join('–')} · dur ${durOf(k)}/${maxDur(k)}${it.ammo?' · uses '+ITEMS[it.ammo].n:''}${it.tool?' · '+(it.tool==='chop'?'chops wood':'mines stone'):''}`:it.t==='armor'?`blocks ${it.def} per hit · dur ${durOf(k)}/${it.dur}`:'';
     return `<div class="row"><span class="ic">${it.icon}</span><span class="nm">${it.n} ×${S.inv[k]}${eq?' ★':''}${info?`<br><span class="dim sm">${info}</span>`:''}</span>${btn}
-    ${ab?`<button class="sm" onclick="stash('${k}')">Stash</button>`:''}<button class="sm" onclick="remItem('${k}');save();openPack()">Drop</button></div>`;}).join('')||'<p class="dim">Empty.</p>'}`);
+    ${ab?`<button class="sm" onclick="stash('${k}')">Stash</button>`:cp?`<button class="sm" onclick="campStash('${k}')">⛺ Stash</button>`:''}<button class="sm" onclick="remItem('${k}');save();openPack()">Drop</button></div>`;}).join('')||'<p class="dim">Empty.</p>'}`);
 }
 /* ---- base economy helpers ---- */
 const atBase=()=>!!(S.base&&pos&&!IN&&dist(pos,S.base)<=CFG.BASE_R);
-const have=k=>k==='sup'?S.sup:(S.inv[k]||0)+(atBase()?(S.stash[k]||0):0);
+const have=k=>{if(k==='sup')return S.sup;const c=nearCamp();return(S.inv[k]||0)+(atBase()?(S.stash[k]||0):0)+(c?(c.stash[k]||0):0);};
 const canPay=c=>Object.entries(c).every(([k,q])=>have(k)>=q);
-function pay(c){for(const[k,q]of Object.entries(c)){if(k==='sup'){S.sup-=q;continue;}const a=Math.min(q,S.inv[k]||0);if(a)remItem(k,a);if(q-a>0)remItem(k,q-a,S.stash);}}
+function pay(c){const cp=nearCamp();for(const[k,q0]of Object.entries(c)){if(k==='sup'){S.sup-=q0;continue;}let q=q0;const a=Math.min(q,S.inv[k]||0);if(a){remItem(k,a);q-=a;}
+  if(q>0&&atBase()){const b=Math.min(q,S.stash[k]||0);if(b){remItem(k,b,S.stash);q-=b;}}if(q>0&&cp){const b=Math.min(q,cp.stash[k]||0);if(b){remItem(k,b,cp.stash);q-=b;}}}}
 const costHtml=c=>Object.entries(c).map(([k,q])=>`${ITEMS[k].icon}${q}<span style="color:${have(k)>=q?'#5cc98a':'#ff8a8d'}">(${have(k)})</span>`).join(' ');
 function statLine(k){const it=ITEMS[k];if(it.t==='weapon')return` <span class="dim sm">· dmg ${it.dmg.join('–')}${it.tool?' · tool':''}${it.noise===0?' · silent':''}</span>`;if(it.t==='armor')return` <span class="dim sm">· armor ${it.def}</span>`;
   const f=[];if(it.food)f.push('+'+it.food+' food');if(it.water)f.push('+'+it.water+' water');if(it.hp)f.push('+'+it.hp+' hp');if(it.stam)f.push('+'+it.stam+' stam');if(it.cure)f.push('cures infection');return f.length?` <span class="dim sm">· ${f.join(', ')}</span>`:'';}
 function openCraft(){
-  const ab=atBase();let html='<h2>🛠️ Craft</h2>'+(ab?'<div class="dim sm">At base — stashed materials count.</div>':'');
+  const ab=atBase();let html='<h2>🛠️ Craft</h2>'+(ab?'<div class="dim sm">At base — stashed materials count.</div>':nearCamp()?'<div class="dim sm">At camp — campfire cooking available; camp stash counts.</div>':'');
   for(const g of ['','workbench','oven','forge','apothecary']){
     const st=STATIONS[g];let lock='';
-    if(g){if(!S.st[g])lock=`🔒 Build a ${st.n} at your base to unlock.`;else if(!ab)lock='Return to base to use the '+st.n+'.';}
+    if(g&&!stationOK(g)){if(!S.st[g])lock=`🔒 Build a ${st.n} at your base to unlock${g==='oven'?' (or cook at a camp\'s campfire)':''}.`;else lock='Return to base to use the '+st.n+(g==='oven'?' (or a camp campfire)':'')+'.';}
     html+=`<h3>${g?st.icon+' '+st.n:'🎒 Anywhere'}</h3>${lock?`<div class="dim sm">${lock}</div>`:''}`;
     if(g==='forge'&&S.st.forge){const id=S.equip;if(id==='fists')html+='<div class="dim sm">Equip a weapon to upgrade it here.</div>';else{const t=(S.wlvl[id]||0)+1,cw=wstats(id);
       html+=t>5?`<div class="row"><span class="ic">⬆️</span><span class="nm">${cw.n} is fully upgraded.</span></div>`:`<div class="row"><span class="ic">⬆️</span><span class="nm"><b>Upgrade ${cw.n} → +${t}</b><br><span class="dim sm">+15% dmg, +20% durability, fully repaired${S.p.lvl<WGATE(t)?` · 🔒 needs Lv ${WGATE(t)}`:''}</span><br><span class="sm">${costHtml(wcost(t))}</span></span><button class="sm" ${!lock&&S.p.lvl>=WGATE(t)&&canPay(wcost(t))?'':'disabled'} onclick="upgradeWeapon()">Forge</button></div>`;}}
@@ -954,16 +963,17 @@ function openCraft(){
   }
   sheet(html);
 }
-function craft(i){const r=RECIPES[i];if(r.st&&(!S.st[r.st]||!atBase()))return;if(!canPay(r.need))return;pay(r.need);addItem(r.out,r.q);save();toast(`Crafted ${ITEMS[r.out].n}${r.q>1?' ×'+r.q:''}.`);openCraft();}
+function craft(i){const r=RECIPES[i];if(r.st&&!stationOK(r.st))return;if(!canPay(r.need))return;pay(r.need);addItem(r.out,r.q);save();toast(`Crafted ${ITEMS[r.out].n}${r.q>1?' ×'+r.q:''}.`);openCraft();}
 function rainTick(){if(!S.st.rainbarrel)return;const n=Math.floor((Date.now()-S.rain.t)/1800000);if(n>0){S.rain.n=Math.min(5,S.rain.n+n);S.rain.t=S.rain.n>=5?Date.now():S.rain.t+n*1800000;}}
 const plotReady=p=>!!p&&Date.now()>=p.t0+p.dur;
 let baseTab='home';
 function openBase(tab){
+  if(tab===undefined&&!atBase()&&nearCamp()){openCamp(nearCamp().id);return;}
   if(typeof tab==='string')baseTab=tab;
   if(!pos){toast('Waiting for location…');return;}
-  if(!S.base){sheet(`<h2>🏚️ Safehouse</h2><p class="dim">No base yet. Set one where you are — home is a good choice. Zombies can't get within ${CFG.BASE_R} m, you heal there, your stash survives death, and you can build a farm and workshops.</p><button class="pri" onclick="setBase()">Set base here</button>`);return;}
+  if(!S.base){sheet(`<h2>🏚️ Safehouse</h2><p class="dim">No base yet. Set one where you are — home is a good choice. Zombies can't get within ${CFG.BASE_R} m, you heal there, your stash survives death, and you can build a farm and workshops.</p><button class="pri" onclick="setBase()">Set base here</button><h3>⛺ Camps</h3>${campsBody()}`);return;}
   rainTick();const d=dist(pos,S.base),here=atBase();
-  const tabs=`<div style="display:flex;gap:6px;margin:8px 0">${[['home','🏚️ Stash'],['build','🔨 Build'],['farm','🌾 Farm'],['animals','🐄 Animals']].concat(S.mode&&S.mode!=='survivor'?[['def','🛡️ Defense']]:[]).map(([k,l])=>`<button class="sm ${baseTab===k?'pri':''}" onclick="openBase('${k}')">${l}</button>`).join('')}</div>`;
+  const tabs=`<div style="display:flex;gap:6px;margin:8px 0">${[['home','🏚️ Stash'],['build','🔨 Build'],['farm','🌾 Farm'],['animals','🐄 Animals'],['camps','⛺ Camps']].concat(S.mode&&S.mode!=='survivor'?[['def','🛡️ Defense']]:[]).map(([k,l])=>`<button class="sm ${baseTab===k?'pri':''}" onclick="openBase('${k}')">${l}</button>`).join('')}</div>`;
   let body='';
   if(baseTab==='home'){
     body=(S.st.rainbarrel?`<div class="row"><span class="ic">🛢️</span><span class="nm">Rain Barrel: ${S.rain.n}/5 💧</span>${here&&S.rain.n?'<button class="sm" onclick="collectRain()">Collect</button>':''}</div>`:'')+
@@ -975,6 +985,7 @@ function openBase(tab){
       return `<div class="row"><span class="ic">${s.icon}</span><span class="nm"><b>${s.n}</b>${built?' ✅':''}<br><span class="dim sm">${s.desc}</span>${built?'':`<br><span class="sm">${lock?'🔒 Requires '+STATIONS[s.req].n:costHtml(s.cost)}</span>`}</span>${built?'':`<button class="sm" ${here&&!lock&&canPay(s.cost)?'':'disabled'} onclick="buildSt('${k}')">Build</button>`}</div>`;}).join('')+
     `<div class="row"><span class="ic">🟫</span><span class="nm"><b>Farm Plot</b> (${S.plots.length}/${MAX_PLOTS})<br><span class="dim sm">Grow potatoes, corn, wheat, herbs. Grows while you're away.</span><br><span class="sm">${costHtml(PLOT_COST)}</span></span><button class="sm" ${here&&S.plots.length<MAX_PLOTS&&canPay(PLOT_COST)?'':'disabled'} onclick="buildPlot()">Build</button></div>`+
     (here?'':'<p class="dim sm">Build at your base. Wood and stone come from 🌲 trees and 🪨 rocks — common in rural areas.</p>');
+  }else if(baseTab==='camps'){body=campsBody();
   }else if(baseTab==='animals'){body=animalBody(here);
   }else if(baseTab==='def'&&S.mode!=='survivor'){body=defBody(here);
   }else{
@@ -1147,19 +1158,4 @@ function saveChorePicker(addSlot){
   const keep=S.chores.filter(c=>c.lib),checked=new Set([...document.querySelectorAll('.libck:checked')].map(x=>x.value));
   const lib=CHORE_LIB.filter(c=>checked.has(c.id)).map(c=>keep.find(k=>k.id===c.id)||{id:c.id,n:c.n,tier:c.tier,rep:c.rep,days:[],lib:true});
   const cust=[];let fixed=0;
-  document.querySelectorAll('.cslot').forEach((el,i)=>{const n=el.querySelector('.cn').value.trim();if(!n)return;const tier=el.querySelector('.ct').value;let rep=el.querySelector('.cr').value;
-    if(tier==='major'&&rep==='daily'){rep='weekly';fixed++;}
-    const old=S.chores.find(c=>c.id===el.dataset.cid);
-    cust.push({id:old?old.id:'u'+Date.now()+'_'+i,n:n.slice(0,50),tier,rep:old&&old.rep==='days'&&rep==='daily'?'days':rep,days:old?.days||[],lib:false});});
-  S.chores=lib.concat(cust.slice(0,MAX_CUSTOM));S.choresSetup=true;save();
-  if(fixed)toast('Major jobs set to weekly.');
-  if(addSlot){openChorePicker(false,+$('#sheet').dataset.slots+1);return;}
-  toast(`Saved ${S.chores.length} chores.`,'#5cc98a');openChores();
-}
-function openChoreEditor(id){
-  const c=S.chores.find(x=>x.id===id);if(!c)return;
-  sheet(`<h2>✏️ ${c.lib?esc(c.n):'Edit chore'}</h2>
-  ${c.lib?`<div class="dim sm">${TIERS[c.tier].n} · ${tierLine(c.tier)}</div>`:`<label class="fl">Name<input id="cN" maxlength="50" value="${esc(c.n)}"></label><label class="fl">Effort tier${tierSel('cT',c.tier)}</label>`}
-  <label class="fl">Repeats<select id="cP" onchange="$('#cDays').style.display=this.value==='days'?'flex':'none'">${[['daily','Every day'],['days','Specific days of the week'],['weekly','Once a week (any day)'],['once','One-time']].map(([v,l])=>`<option value="${v}" ${c.rep===v?'selected':''}>${l}</option>`).join('')}</select></label>
-  <div id="cDays" style="display:${c.rep==='days'?'flex':'none'};gap:4px;flex-wrap:wrap;margin-top:6px">${DAYN.map((d,i)=>`<label class="day"><input type="checkbox" value="${i}" ${(c.days||[]).includes(i)?'checked':''}>${d}</label>`).join('')}</div>
-  <div class="grid2" style="margin-top:12px"><button onc
+  docum
