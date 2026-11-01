@@ -130,7 +130,7 @@ h2{margin:0 0 6px;font-size:18px}h3{margin:12px 0 6px;font-size:14px;color:var(-
 <div id="modal"><div class="box" id="mbox"></div></div>
 
 <div id="start">
-  <h1>DEAD RADIUS</h1><div class="sm" style="color:#5a6b60">v0.11</div>
+  <h1>DEAD RADIUS</h1><div class="sm" style="color:#5a6b60" id="verTag">v0.12</div>
   <p>Your neighborhood is the map. Real stores, gas stations, pharmacies and houses near you are lootable. The dead are walking toward you.</p>
   <div class="sm" style="color:#d8e0d6">Buildings on the map:</div>
   <div class="seg" id="mapSeg"><button data-m="real" onclick="pickMap('real')">📍 Accurate — real places only</button><button data-m="mixed" onclick="pickMap('mixed')">🎲 Real + generated ruins</button></div>
@@ -142,6 +142,17 @@ h2{margin:0 0 6px;font-size:18px}h3{margin:12px 0 6px;font-size:14px;color:var(-
   <p class="sm">Watch where you're walking. Loot is virtual — stay on public sidewalks; don't enter property. Game pauses above ~25 km/h, so no playing while driving.</p>
 </div>
 
+<script>
+/* Android app bridge: route navigator.geolocation to native FusedLocation GPS */
+if(window.DRNative){(function(){const subs={};let id=0,last=null;
+  window.__drLoc=(lat,lng,acc,spd,t)=>{last={coords:{latitude:lat,longitude:lng,accuracy:acc,speed:spd<0?null:spd,altitude:null,heading:null},timestamp:t};for(const k in subs)try{subs[k].s(last);}catch(e){}};
+  window.__drLocErr=(code,msg)=>{for(const k in subs)try{subs[k].e&&subs[k].e({code,message:msg||''});}catch(e){}};
+  const geo={watchPosition(s,e){const i=++id;subs[i]={s,e};DRNative.startLocation();if(last)setTimeout(()=>s(last),0);return i;},
+    clearWatch(i){delete subs[i];if(!Object.keys(subs).length)DRNative.stopLocation();},
+    getCurrentPosition(s,e){if(last)return setTimeout(()=>s(last),0);const i=geo.watchPosition(p=>{geo.clearWatch(i);s(p);},er=>{geo.clearWatch(i);e&&e(er);});}};
+  try{Object.defineProperty(navigator,'geolocation',{value:geo,configurable:true});}catch(e){}
+})();}
+</script>
 <script>
 /* error reporter: shows any startup/runtime error on screen instead of failing silently */
 window.__errs=[];
@@ -331,7 +342,15 @@ if(!S||typeof S!=='object'||!S.p||!S.inv)S=fresh();
 S.st=S.st||{};S.plots=S.plots||[];S.rain=S.rain||{n:0,t:Date.now()};S.harv=S.harv||{};S.armor=S.armor||null;S.def=S.def||{wall:0,traps:0,tower:0};S.horde=S.horde||{next:null,wave:1,wall:0};S.wlvl=S.wlvl||{};S.sup=S.sup||0;S.choreDone=S.choreDone||{};S.animals=S.animals||[];S.lead=S.lead||[];S.feed=S.feed||0;S.mapMode=S.mapMode||'real';S.camps=S.camps||[];
 try{for(const k of Object.keys(localStorage))if(/^drscan[23]_/.test(k))localStorage.removeItem(k);}catch(e){}if(S.rural==null)S.rural=.5;
 for(const k in S.harv)if(Date.now()-S.harv[k]>7200000)delete S.harv[k];
-function save(){try{localStorage.setItem(CFG.SAVE,JSON.stringify(S));}catch(e){}}
+function save(){try{localStorage.setItem(CFG.SAVE,JSON.stringify(S));}catch(e){}nativeSync();}
+let _nsLast='';
+function nativeSync(){if(!window.DRNative)return;try{const plan={},now=Date.now();
+  if(S.mode&&S.mode!=='survivor'&&S.base&&S.horde&&S.horde.next){plan.horde1h=[S.horde.next-36e5,'🧟 Horde in 1 hour',`Wave ${S.horde.wave} hits your safehouse in about an hour. Check your walls.`];plan.horde=[S.horde.next,'🧟 The horde is at your gates',`Wave ${S.horde.wave} has arrived. Open Dead Radius to choose how to face it.`];}
+  const rd=(S.plots||[]).filter(p=>p&&now<p.t0+p.dur).map(p=>p.t0+p.dur);if(rd.length)plan.crops=[Math.min(...rd),'🌾 Crops ready','A crop is ready to harvest at your safehouse.'];
+  if(S.mode==='chores'){const t=new Date();t.setHours(18,0,0,0);if(+t<now)t.setDate(t.getDate()+1);plan.chores=[+t,'✅ Chore check-in','Knock out a chore or two — your walls need supplies.'];}
+  const sig=JSON.stringify(plan);if(sig===_nsLast)return;_nsLast=sig;
+  for(const k of['horde1h','horde','crops','chores']){if(plan[k]&&plan[k][0]>now)DRNative.schedule(k,plan[k][0],plan[k][1],plan[k][2]);else DRNative.cancel(k);}
+}catch(e){}}
 
 let pos=null,acc=0,speed=0,lastFix=null,demo=false,demoSpeed=1,demoTarget=null,follow=true,started=false;
 let sites=new Map(),zombies=[],E=null,searching=null,scanning=false,lastScan=null,scanFailAt=0,graceUntil=0,LOG=[],curSheet=null,zid=0,saveTick=0;
@@ -554,6 +573,7 @@ async function buildPack(km){
     }
   }catch(e){packBusy=false;sheet(`<h2>📦 Area pack failed</h2><p>${esc(e.message)}</p><p class="dim sm">The servers are probably overloaded — try again later (early morning is fastest), or a smaller size.</p><button onclick="openPackBuilder()">Back</button>`);return;}
   packBusy=false;REGION=pack;
+  if(window.DRNative){const ok=DRNative.saveRegion(JSON.stringify(pack));sheet(`<h2>📦 Area pack ${ok?'saved':'failed to save'}</h2><p>${pack.pois.length} places, ${pack.cand.length} buildings, ${pack.nat.length} nature areas.</p><p>${ok?'<b>Saved inside the app</b> — map data inside this area now loads instantly, even offline. Nothing to upload.':'Couldn\'t write the file — try again.'}</p>`);lastScan=null;scan();return;}
   const json=JSON.stringify(pack),blob=new Blob([json],{type:'application/json'}),url=URL.createObjectURL(blob);
   sheet(`<h2>📦 Area pack ready</h2><p>${pack.pois.length} places, ${pack.cand.length} buildings, ${pack.nat.length} nature areas · ${(json.length/1048576).toFixed(2)} MB</p>
   <p><b>It's active now on this device.</b> To make it permanent (and instant on every device):</p>
@@ -1587,7 +1607,7 @@ setInterval(()=>{
   }
   hud();if(++saveTick%10===0)save();
 },1000);
-if(!S.chores)S.chores=[];migrateChores();pickMap(S.mapMode);pickDens(S.density||'med');applyMode();
+if(!S.chores)S.chores=[];migrateChores();pickMap(S.mapMode);pickDens(S.density||'med');if(window.DRNative)$('#verTag').textContent+=' · Android app';applyMode();
 document.addEventListener('visibilitychange',()=>{if(document.hidden)save();});
 hud();
 </script>
