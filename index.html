@@ -57,6 +57,7 @@ h2{margin:0 0 6px;font-size:18px}h3{margin:12px 0 6px;font-size:14px;color:var(-
 .site{font-size:21px;line-height:30px;text-align:center;width:30px;height:30px;border-radius:50%;background:#000a;border:1px solid #fff3;filter:drop-shadow(0 0 3px #000)}
 .site.looted{filter:grayscale(1);opacity:.4}
 .site.res{width:26px;height:26px;line-height:26px;font-size:16px;background:#0b1f12b0;border-color:#5cc98a55}
+.site.est{border-style:dotted;border-color:#8fd14fbb}
 .site.gen{border-style:dashed;border-color:#f2a03d99}
 .critter{font-size:26px;line-height:30px;text-align:center;filter:drop-shadow(0 0 4px #fff8)}
 .seg{display:flex;gap:6px;justify-content:center;margin:4px 0 10px}.seg button{width:auto!important;margin:0!important;padding:8px 10px!important;font-size:13px}
@@ -130,7 +131,7 @@ h2{margin:0 0 6px;font-size:18px}h3{margin:12px 0 6px;font-size:14px;color:var(-
 <div id="modal"><div class="box" id="mbox"></div></div>
 
 <div id="start">
-  <h1>DEAD RADIUS</h1><div class="sm" style="color:#5a6b60" id="verTag">v0.12</div>
+  <h1>DEAD RADIUS</h1><div class="sm" style="color:#5a6b60" id="verTag">v0.13</div>
   <p>Your neighborhood is the map. Real stores, gas stations, pharmacies and houses near you are lootable. The dead are walking toward you.</p>
   <div class="sm" style="color:#d8e0d6">Buildings on the map:</div>
   <div class="seg" id="mapSeg"><button data-m="real" onclick="pickMap('real')">📍 Accurate — real places only</button><button data-m="mixed" onclick="pickMap('mixed')">🎲 Real + generated ruins</button></div>
@@ -340,7 +341,7 @@ function fresh(){return{p:{hp:100,maxHp:100,food:80,water:80,stam:100,inf:false,
 let S;try{S=JSON.parse(localStorage.getItem(CFG.SAVE));}catch(e){}
 if(!S||typeof S!=='object'||!S.p||!S.inv)S=fresh();
 S.st=S.st||{};S.plots=S.plots||[];S.rain=S.rain||{n:0,t:Date.now()};S.harv=S.harv||{};S.armor=S.armor||null;S.def=S.def||{wall:0,traps:0,tower:0};S.horde=S.horde||{next:null,wave:1,wall:0};S.wlvl=S.wlvl||{};S.sup=S.sup||0;S.choreDone=S.choreDone||{};S.animals=S.animals||[];S.lead=S.lead||[];S.feed=S.feed||0;S.mapMode=S.mapMode||'real';S.camps=S.camps||[];
-try{for(const k of Object.keys(localStorage))if(/^drscan[23]_/.test(k))localStorage.removeItem(k);}catch(e){}if(S.rural==null)S.rural=.5;
+try{for(const k of Object.keys(localStorage))if(/^drscan[234]_/.test(k))localStorage.removeItem(k);}catch(e){}if(S.rural==null)S.rural=.5;
 for(const k in S.harv)if(Date.now()-S.harv[k]>7200000)delete S.harv[k];
 function save(){try{localStorage.setItem(CFG.SAVE,JSON.stringify(S));}catch(e){}nativeSync();}
 let _nsLast='';
@@ -492,7 +493,7 @@ async function overpassBB(body){
   if(j&&j.elements.length&&!j.elements.some(elPos))j=await overpass(`[out:json][timeout:50];(${body});out tags center;`);
   return j;
 }
-const scanKey=p=>'drscan4_'+Math.round(p.lat*200)+'_'+Math.round(p.lng*200);
+const scanKey=p=>'drscan5_'+Math.round(p.lat*200)+'_'+Math.round(p.lng*200);
 async function scan(force){
   if(scanning||!pos)return;scanning=true;lastScan={...pos};const here={...pos},key=scanKey(here),A=`(around:${CFG.SCAN_R},${here.lat},${here.lng})`;
   await Promise.race([regionReady,new Promise(r=>setTimeout(r,3000))]);
@@ -511,7 +512,9 @@ async function scan(force){
   const j2=await overpassBB(`way["building"]${A};`);
   let cand=[],raw=null;
   if(!j2)scanRetryAt=Date.now()+backoff();
-  if(j2){const B=parseBuildings(j2.elements,pois,zones);raw=B.pts.length;cand=B.cand.map(c=>[dist(here,c),c]).sort((a,b)=>a[0]-b[0]).slice(0,800).map(x=>x[1]);}
+  if(j2){const B=parseBuildings(j2.elements,pois,zones);raw=B.pts.length;cand=B.cand;
+    if(raw<250){scanStatus='loading roads & addresses…';const j3=await overpass(`[out:json][timeout:50];(${ROAD_Q(A)});out geom;`);if(j3)cand=cand.concat(estHouses(j3.elements,cand.concat(pois)));}
+    cand=cand.map(c=>[dist(here,c),c]).sort((a,b)=>a[0]-b[0]).slice(0,800).map(x=>x[1]);}
   const res={t:Date.now(),c:here,pois,nat,cand,raw};
   if(j2){try{localStorage.setItem(key,JSON.stringify(res));const idx=JSON.parse(localStorage.getItem('drscan_idx')||'[]').filter(k=>k!==key);idx.push(key);
     while(idx.length>12)localStorage.removeItem(idx.shift());localStorage.setItem('drscan_idx',JSON.stringify(idx));}catch(e){}}
@@ -540,6 +543,28 @@ function parseBuildings(els,pois,zones){
     const cat=classifyBuilding(t,elArea(el),p,zones);if(!cat)continue;cand.push({id,lat:+p.lat.toFixed(6),lng:+p.lng.toFixed(6),cat,name:siteName(t,cat)});}
   return{cand,pts};
 }
+/* ---- estimated homes: where OSM has roads/addresses but no building outlines (common in rural areas) ---- */
+const ROAD_Q=F=>`way["highway"~"^(residential|unclassified|living_street|tertiary|secondary|road)$"]${F};node["addr:housenumber"]${F};`;
+function estHouses(els,existing){
+  const G=new Map(),key=(la,ln)=>Math.floor(la/.0005)+'_'+Math.floor(ln/.0007),add=p=>{const k=key(p.lat,p.lng);(G.get(k)||G.set(k,[]).get(k)).push(p);};
+  const near=(p,r)=>{const a=Math.floor(p.lat/.0005),b=Math.floor(p.lng/.0007);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const L=G.get((a+i)+'_'+(b+j));if(L&&L.some(e=>dist(e,p)<r))return true;}return false;};
+  for(const e of existing)add(e);
+  const out=[];
+  for(const el of els)if(el.type==='node'&&el.tags&&el.tags['addr:housenumber']){const p={lat:el.lat,lng:el.lon};if(near(p,25))continue;
+    const h={id:'addr'+el.id,lat:+p.lat.toFixed(6),lng:+p.lng.toFixed(6),cat:'house',name:`${el.tags['addr:housenumber']} ${el.tags['addr:street']||''}`.trim(),est:'addr'};out.push(h);add(h);}
+  for(const el of els){
+    if(el.type!=='way'||!el.geometry||el.geometry.length<2)continue;const st=el.tags&&el.tags.name;let carry=35,side=1,k=0;
+    for(let i=1;i<el.geometry.length;i++){
+      const a={lat:el.geometry[i-1].lat,lng:el.geometry[i-1].lon},b={lat:el.geometry[i].lat,lng:el.geometry[i].lon},d=dist(a,b);if(!d)continue;const dl=delta(a,b);let t=carry;
+      while(t<d){const f=t/d,p0=offset(a,dl.dx*f,dl.dy*f),p=offset(p0,-dl.dy/d*18*side,dl.dx/d*18*side),R=mulberry(hashStr(el.id+'_'+k)),r1=R(),r2=R();
+        if(r1<.6&&!near(p,45)){const h={id:`est${el.id}_${k}`,lat:+p.lat.toFixed(6),lng:+p.lng.toFixed(6),cat:r2<.12?'barn':'house',name:st?(r2<.12?`Barn on ${st}`:`House on ${st}`):'House',est:'road'};out.push(h);add(h);}
+        side=-side;k++;t+=70;}
+      carry=t-d;
+    }
+  }
+  return out;
+}
+function toggleEst(){S.estHouses=S.estHouses===false;save();if(lastScanRes)applyScan(lastScanRes,lastScanHere,'re-thinned');openSettings();}
 /* ---- area pack: region.json next to index.html = instant map data, no slow servers ---- */
 let REGION=null;
 const regionReady=fetch('region.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v===1&&j.bbox){REGION=j;}}).catch(()=>{});
@@ -566,6 +591,7 @@ async function buildPack(km){
       status(`Chunk ${done+1}/${total}: buildings…`);
       const b=await overpass(`[out:json][timeout:170];(way["building"]${F};);out tags bb;`,190000);if(!b)throw new Error('buildings: '+ovLog.join(' · '));
       const B=parseBuildings(b.elements,P.pois,P.zones);
+      if(b.elements.length<1500){status(`Chunk ${done+1}/${total}: roads & addresses…`);const c3=await overpass(`[out:json][timeout:170];(${ROAD_Q(F)});out geom;`,190000);if(c3)B.cand.push(...estHouses(c3.elements,B.cand.concat(P.pois)));}
       for(const x of P.pois)if(!seen.has(x.id)){seen.add(x.id);pack.pois.push(x);}
       for(const x of P.nat)if(!seen.has(x.id)){seen.add(x.id);pack.nat.push(x);}
       for(const x of B.cand)if(!seen.has(x.id)){seen.add(x.id);pack.cand.push(x);}
@@ -597,7 +623,7 @@ function thinSites(res,here){
   for(const p of res.pois.slice().sort((a,b)=>dist(here,a)-dist(here,b)))if(!pois.some(k=>k.cat===p.cat&&dist(k,p)<D.poi))pois.push(p);
   const pri={industrial:3,store:3,hardware:3,apartment:2,civic:2,barn:2,cabin:2},oth=new Map(),hs=new Map();
   const bk=c=>Math.floor(c.lat/D.hc)+'_'+Math.floor(c.lng/(D.hc*1.36)),sk=c=>Math.floor(c.lat/D.oc)+'_'+Math.floor(c.lng/(D.oc*1.36));
-  for(const c0 of res.cand||[]){if(pois.some(p=>dist(p,c0)<30))continue;const c={...c0,d:dist(here,c0)};
+  for(const c0 of res.cand||[]){if(c0.est&&S.estHouses===false)continue;if(pois.some(p=>dist(p,c0)<30))continue;const c={...c0,d:dist(here,c0)};
     if(c.cat==='house'){const k=bk(c),o=hs.get(k);if(!o||c.d<o.d)hs.set(k,c);continue;}
     const k=sk(c),o=oth.get(k);if(!o||(pri[c.cat]||1)>(pri[o.cat]||1)||((pri[c.cat]||1)===(pri[o.cat]||1)&&c.d<o.d))oth.set(k,c);}
   const others=[...oth.values()].sort((a,b)=>a.d-b.d).slice(0,D.oMax),taken=new Set(others.map(bk));
@@ -615,10 +641,10 @@ function applyScan(res,here,how){
   if(res.raw!=null){const B=res.raw+res.pois.length;S.rural=B<40?1:B<120?.6:B<300?.3:.12;if(res.nat.length>4)S.rural=Math.max(S.rural,.45);}
   refreshRes();pruneSites();
   if(how==='partial'){if(added)toast(`Found ${added} businesses — loading buildings…`);return;}
-  realNear=[...sites.values()].filter(x=>!x.gen&&dist(here,x)<CFG.SCAN_R).length;
+  realNear=[...sites.values()].filter(x=>!x.gen&&x.est!=='road'&&dist(here,x)<CFG.SCAN_R).length;const estN=[...sites.values()].filter(x=>x.est==='road'&&dist(here,x)<CFG.SCAN_R).length;
   const mix={};for(const s of sites.values())if(!s.gen&&dist(here,s)<CFG.SCAN_R)mix[s.cat]=(mix[s.cat]||0)+1;
-  scanStatus=`OK (${how}) — ${realNear} real places: ${Object.entries(mix).sort((a,b)=>b[1]-a[1]).map(([k,n])=>CAT[k].icon+n).join(' ')} · ${new Date(res.t||Date.now()).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`;
-  genFill(clamp(1-realNear/30,0,1));if(added)toast(`Scouted ${added} real locations nearby.`);
+  scanStatus=`OK (${how}) — ${realNear} real places${estN?` + ${estN} estimated homes`:''}: ${Object.entries(mix).sort((a,b)=>b[1]-a[1]).map(([k,n])=>CAT[k].icon+n).join(' ')} · ${new Date(res.t||Date.now()).toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}`;
+  genFill(clamp(1-realNear/30,0,1));if(added)toast(`Scouted ${added} locations nearby${estN?` (incl. ${estN} estimated homes)`:''}.`);
 }
 let scanStatus='not yet',realNear=0,scanRetryAt=0;
 const GEN_NAMES={house:'Abandoned House',barn:'Old Barn',cabin:'Hunting Cabin',camp:'Abandoned Campsite',wreck:'Wrecked Car',industrial:'Abandoned Workshop',store:'Looted Shop'};
@@ -642,7 +668,7 @@ function setMapMode(m){S.mapMode=m;save();genFill(scanStatus.startsWith('OK')?cl
 function addSite(s){s.mk=L.marker(s,{icon:siteIcon(s)}).addTo(map).on('click',()=>openSite(s));sites.set(s.id,s);}
 function pruneSites(){for(const[id,s]of sites)if(dist(pos,s)>CFG.DROP_R){map.removeLayer(s.mk);sites.delete(id);}}
 const lootedLeft=s=>{const t=S.looted[s.id];if(!t)return 0;const left=t+CFG.COOLDOWN_MIN*60000-Date.now();if(left<=0){delete S.looted[s.id];return 0;}return left;};
-function siteIcon(s){const inr=pos&&dist(pos,s)<=CFG.SCAV_RANGE;return icon('site'+(s.gen?' gen':'')+(lootedLeft(s)?' looted':'')+(inr?' inr':''),CAT[s.cat].icon);}
+function siteIcon(s){const inr=pos&&dist(pos,s)<=CFG.SCAV_RANGE;return icon('site'+(s.gen?' gen':'')+(s.est==='road'?' est':'')+(lootedLeft(s)?' looted':'')+(inr?' inr':''),CAT[s.cat].icon);}
 
 function openSite(s){
   const render=()=>{
@@ -654,7 +680,7 @@ function openSite(s){
     else if(d>CFG.SCAV_RANGE)act=`<button disabled>Get within ${CFG.SCAV_RANGE} m to search</button>`;
     else if(c.noInside)act=`<button class="pri" style="width:100%" onclick="quickSearch('${s.id}')">🔦 Search (${Math.round(Math.min(.95,c.danger*1.25*(isNight()?1.3:1))*100)}% ambush)</button>`;
     else act=`<div class="grid2"><button onclick="quickSearch('${s.id}')">⚡ Quick search<br><span class="sm dim">${Math.round(Math.min(.95,c.danger*1.25*(isNight()?1.3:1))*100)}% ambush · less loot</span></button><button class="pri" onclick="enterBuilding('${s.id}')">🚪 Go inside<br><span class="sm">explore · best loot</span></button></div>`;
-    return `<h2>${c.icon} ${esc(s.name)}</h2><div class="dim">${c.label} · ${fm(d)} away</div><div class="sm" style="margin-top:2px">${s.gen?'🎲 Generated ruin (not a real place)':'📍 Real place · OpenStreetMap'}</div><h3>Likely loot</h3><div class="sm">${LOOT[s.cat].slice().sort((a,b)=>b[1]-a[1]).slice(0,6).map(x=>ITEMS[x[0]].icon+' '+ITEMS[x[0]].n).join(' · ')}</div><div style="margin-top:12px">${act}</div>`;
+    return `<h2>${c.icon} ${esc(s.name)}</h2><div class="dim">${c.label} · ${fm(d)} away</div><div class="sm" style="margin-top:2px">${s.gen?'🎲 Generated ruin (not a real place)':s.est==='road'?'🛣️ Estimated home — real road, but no building is mapped here':s.est==='addr'?'📍 Real address point · OpenStreetMap':'📍 Real place · OpenStreetMap'}</div><h3>Likely loot</h3><div class="sm">${LOOT[s.cat].slice().sort((a,b)=>b[1]-a[1]).slice(0,6).map(x=>ITEMS[x[0]].icon+' '+ITEMS[x[0]].n).join(' · ')}</div><div style="margin-top:12px">${act}</div>`;
   };
   sheet(render(),()=>{if(!(searching&&searching.s===s))$('#sheet').innerHTML='<button class="x" onclick="closeSheet()">✕</button>'+render();});
 }
@@ -1494,6 +1520,7 @@ function openSettings(){
   <h3>Game mode</h3><div class="sm">${S.mode?MODES[S.mode].icon+' '+MODES[S.mode].n:'—'} <button class="sm" onclick="openModePicker()">Change</button></div>
   ${S.mode&&S.mode!=='survivor'?`<div class="sm" style="margin-top:6px">Horde every: ${[1,2,3,7].map(d=>`<button class="sm ${hordeInterval()/864e5===d?'pri':''}" onclick="setHordeDays(${d})">${d}d</button>`).join(' ')}</div>`:''}
   <h3>Building density</h3><div class="seg" style="justify-content:flex-start">${Object.entries(DENS).map(([k,d])=>`<button class="sm ${(S.density||'med')===k?'pri':''}" onclick="setDensity('${k}');openSettings()">${d.n}</button>`).join('')}</div><div class="dim sm">Low ≈ ${DENS.low.hMax} houses + ${DENS.low.oMax} other buildings nearby · Medium ≈ ${DENS.med.hMax}+${DENS.med.oMax} · High ≈ ${DENS.high.hMax}+${DENS.high.oMax}. Businesses always show (nearby duplicates merged).</div>
+  <div class="row"><span class="nm">🛣️ Fill unmapped homes along real roads<br><span class="dim sm">Where OpenStreetMap has roads/addresses but no building outlines (common in rural areas). Shown with a dotted border.</span></span><button class="sm ${S.estHouses===false?'':'pri'}" onclick="toggleEst()">${S.estHouses===false?'Off':'On'}</button></div>
   <h3>Map buildings</h3><div class="seg" style="justify-content:flex-start">${[['real','📍 Real only'],['mixed','🎲 Real + generated']].map(([m,l])=>`<button class="sm ${S.mapMode===m?'pri':''}" onclick="setMapMode('${m}');openSettings()">${l}</button>`).join('')}</div><div class="dim sm">Last map scan: ${scanStatus}</div>
   <h3>Location</h3><div class="sm dim">${demo?'Demo — tap the map to walk.':'GPS — '+(pos?'accuracy ±'+Math.round(acc)+' m':'waiting for fix')}</div>
   ${demo?`<div style="margin-top:6px">Walk speed: ${[1,3,5].map(v=>`<button class="sm ${demoSpeed===v?'pri':''}" onclick="demoSpeed=${v};openSettings()">${v}×</button>`).join(' ')}</div>`:''}
