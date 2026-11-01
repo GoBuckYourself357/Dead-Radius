@@ -130,7 +130,7 @@ h2{margin:0 0 6px;font-size:18px}h3{margin:12px 0 6px;font-size:14px;color:var(-
 <div id="modal"><div class="box" id="mbox"></div></div>
 
 <div id="start">
-  <h1>DEAD RADIUS</h1><div class="sm" style="color:#5a6b60">v0.10.1</div>
+  <h1>DEAD RADIUS</h1><div class="sm" style="color:#5a6b60">v0.11</div>
   <p>Your neighborhood is the map. Real stores, gas stations, pharmacies and houses near you are lootable. The dead are walking toward you.</p>
   <div class="sm" style="color:#d8e0d6">Buildings on the map:</div>
   <div class="seg" id="mapSeg"><button data-m="real" onclick="pickMap('real')">📍 Accurate — real places only</button><button data-m="mixed" onclick="pickMap('mixed')">🎲 Real + generated ruins</button></div>
@@ -436,22 +436,21 @@ function classifyBuilding(t,area,p,zones){
   return'house';
 }
 let ovLog=[],ovFails=0,ovCool={};
-async function overpass(q,tmo=30000){
-  // try the last server that worked first; skip servers that told us to back off
+async function overpass(q,tmo=60000){
+  // race the two best servers at once; take whichever answers first, then fall back to the rest
   const start=Math.max(0,OVERPASS.indexOf(S.ovGood)),order=OVERPASS.slice(start).concat(OVERPASS.slice(0,start));ovLog=[];
-  for(const url of order){
-    const host=url.split('/')[2];
-    if(ovCool[url]>Date.now()){ovLog.push(`${host}: cooling down (${Math.ceil((ovCool[url]-Date.now())/6e4)} min)`);continue;}
-    const t0=Date.now();
-    try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),tmo);
-      const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal});
-      clearTimeout(to);
+  const ready=[];for(const url of order){if(ovCool[url]>Date.now())ovLog.push(`${url.split('/')[2]}: cooling down (${Math.ceil((ovCool[url]-Date.now())/6e4)} min)`);else ready.push(url);}
+  const ctls=[];
+  const attempt=url=>new Promise(async(res,rej)=>{const host=url.split('/')[2],t0=Date.now(),ctl=new AbortController();ctls.push(ctl);const to=setTimeout(()=>ctl.abort(),tmo);
+    try{const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal});clearTimeout(to);
       if(r.ok){let j=null;try{j=await r.json();}catch(e){}
-        if(j&&Array.isArray(j.elements)){ovLog.push(`${host}: OK ${((Date.now()-t0)/1000).toFixed(1)}s, ${j.elements.length} items${j.remark?' (partial: '+String(j.remark).slice(0,40)+')':''}`);S.ovGood=url;ovFails=0;return j;}
-        ovLog.push(`${host}: bad response`);}
-      else{ovLog.push(`${host}: HTTP ${r.status}${r.status===429?' (rate-limited)':r.status===504?' (server overloaded)':''}`);if(r.status===429||r.status===504)ovCool[url]=Date.now()+(r.status===429?180000:60000);}
-    }catch(e){ovLog.push(`${host}: ${e.name==='AbortError'?'timed out':'network error / blocked'} after ${((Date.now()-t0)/1000).toFixed(0)}s`);}
-  }
+        if(j&&Array.isArray(j.elements)){ovLog.push(`${host}: OK ${((Date.now()-t0)/1000).toFixed(1)}s, ${j.elements.length} items${j.remark?' (partial)':''}`);S.ovGood=url;return res(j);}
+        if(!ctl._won)ovLog.push(`${host}: bad response`);return rej();}
+      ovLog.push(`${host}: HTTP ${r.status}${r.status===429?' (rate-limited)':r.status===504?' (server overloaded)':''}`);if(r.status===429||r.status===504)ovCool[url]=Date.now()+(r.status===429?180000:60000);rej();}
+    catch(e){clearTimeout(to);if(!ctl._won)ovLog.push(`${host}: ${e.name==='AbortError'?'timed out':'network error / blocked'} after ${((Date.now()-t0)/1000).toFixed(0)}s`);rej();}});
+  const done=j=>{for(const c of ctls){c._won=true;try{c.abort();}catch(e){}}ovFails=0;return j;};
+  try{return done(await Promise.any(ready.slice(0,2).map(attempt)));}catch(e){}
+  for(const url of ready.slice(2)){try{return done(await attempt(url));}catch(e){}}
   ovFails++;return null;
 }
 function nearestCache(here){try{let best=null,bd=1e9;for(const k of JSON.parse(localStorage.getItem('drscan_idx')||'[]')){const c=JSON.parse(localStorage.getItem(k)||'null');if(!c||!c.c)continue;const d=dist(here,c.c);if(d<bd){bd=d;best=c;}}return bd<1200?best:null;}catch(e){return null;}}
@@ -460,57 +459,116 @@ async function testServers(){
   sheet('<h2>🩺 Map server test</h2><p class="dim">Testing each server…</p>');
   const p=pos||CFG.DEMO_START,rows=[];
   for(const url of OVERPASS){const host=url.split('/')[2],t0=Date.now();let res;
-    try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),15000);
-      const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(`[out:json][timeout:10];node(around:100,${p.lat},${p.lng});out ids 1;`),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal});clearTimeout(to);
+    try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),40000);
+      const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(`[out:json][timeout:30];node(around:100,${p.lat},${p.lng});out ids 1;`),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal});clearTimeout(to);
       res=r.ok?`✅ OK (${((Date.now()-t0)/1000).toFixed(1)} s)`:`❌ HTTP ${r.status}${r.status===429?' — rate-limited, wait a few min':r.status===504?' — overloaded':''}`;}
-    catch(e){res=e.name==='AbortError'?'❌ timed out (15 s)':'❌ network error / blocked';}
+    catch(e){res=e.name==='AbortError'?'❌ timed out (40 s) — server very busy':'❌ network error / blocked';}
+    if(res.startsWith('✅')&&(Date.now()-t0)>10000)res+=' — slow but working';
     rows.push(`<div class="row"><span class="nm"><b>${host}</b><br><span class="sm">${res}</span></span></div>`);
     sheet(`<h2>🩺 Map server test</h2>${rows.join('')}<p class="dim sm">${rows.length<OVERPASS.length?'Testing…':'If all fail with "network error", your network or a blocker (ad-blocker, private DNS, data saver, VPN) is stopping them. If they show 429, you\'re rate-limited — wait 5–10 min. Last scan log:<br>'+ovLog.map(esc).join('<br>')}</p>`);}
 }
 async function overpassBB(body){
   // 'out tags bb' gives footprints for size; fall back to 'out tags center' if a server returns no geometry.
-  let j=await overpass(`[out:json][timeout:25];(${body});out tags bb;`);
-  if(j&&j.elements.length&&!j.elements.some(elPos))j=await overpass(`[out:json][timeout:25];(${body});out tags center;`);
+  let j=await overpass(`[out:json][timeout:50];(${body});out tags bb;`);
+  if(j&&j.elements.length&&!j.elements.some(elPos))j=await overpass(`[out:json][timeout:50];(${body});out tags center;`);
   return j;
 }
 const scanKey=p=>'drscan4_'+Math.round(p.lat*200)+'_'+Math.round(p.lng*200);
 async function scan(force){
   if(scanning||!pos)return;scanning=true;lastScan={...pos};const here={...pos},key=scanKey(here),A=`(around:${CFG.SCAN_R},${here.lat},${here.lng})`;
+  await Promise.race([regionReady,new Promise(r=>setTimeout(r,3000))]);
+  const rr=regionRes(here);if(rr){scanning=false;applyScan(rr,here,'area pack');return;}
   let cached=null;try{cached=JSON.parse(localStorage.getItem(key));}catch(e){}
   if(cached&&!force&&Date.now()-cached.t<7*864e5){applyScan(cached,here,'cached');scanning=false;return;}
-  scanStatus='loading places…';
-  const j1=await overpassBB(`nwr["shop"]${A};nwr["amenity"~"^(pharmacy|fuel|restaurant|fast_food|cafe|bar|pub|hospital|clinic|doctors|dentist|veterinary|police|fire_station|school|library|townhall|post_office|place_of_worship|bank|community_centre)$"]${A};nwr["craft"]${A};nwr["office"]${A};way["landuse"~"^(industrial|commercial|retail)$"]${A};nwr["natural"~"^(wood|scrub|heath|bare_rock|scree|stone|cliff|rock|grassland)$"]${A};nwr["landuse"~"^(forest|orchard|quarry|meadow|farmland)$"]${A};nwr["leisure"="park"]${A};`);
+  scanStatus='loading places… (servers can take up to a minute when busy)';
+  const j1=await overpassBB(PLACES_Q(A));
   if(!j1){scanning=false;scanFailAt=Date.now();const wait=backoff();scanRetryAt=Date.now()+wait;const why=ovLog.slice(-1)[0]||'no response';
     scanStatus=`failed ${new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} — ${ovLog.join(' · ')}`;
     const nc=cached||nearestCache(here);if(nc){applyScan(nc,here,'cached (offline)');toast(`Using saved map data — live data failed (${why}). Retrying in ${wait/6e4} min.`,'#f2a03d');return;}
-    if(S.mapMode==='mixed'){genFill(1);toast(`Map data unavailable (${why}) — showing generated ruins. Retrying in ${wait/6e4} min.`,'#f2a03d');}else toast(`Couldn't load map data (${why}). Retrying in ${wait/6e4} min — ⚙️ More → Test map servers for details.`,'#f2a03d');return;}
-  const pois=[],nat=[],zones=[];
-  for(const el of j1.elements){
-    const t=el.tags||{},p=elPos(el);if(!p)continue;
-    if(['industrial','commercial','retail'].includes(t.landuse)&&!t.building){if(el.bounds)zones.push({type:t.landuse,b:el.bounds});
-      if(t.name){const cat=/lumber|hardware|building supply|home center/i.test(t.name)?'hardware':t.landuse==='industrial'?'industrial':'store';pois.push({id:'osm'+el.type[0]+el.id,lat:p.lat,lng:p.lng,cat,name:t.name});}continue;}
-    const nt=!t.building&&!t.shop&&!t.amenity&&natType(t);
-    if(nt){let c=p;const d=dist(here,c);if(d>600){const R=mulberry(hashStr('n'+el.id)),k=(150+R()*300)/d;c={lat:here.lat+(p.lat-here.lat)*k,lng:here.lng+(p.lng-here.lng)*k};}
-      nat.push({id:'n'+el.type[0]+el.id,lat:c.lat,lng:c.lng,type:nt,n:nt==='tree'?5:3});continue;}
-    let cat=classify(t);if(!cat&&t.office)cat='civic';if(!cat)continue;
-    if(cat==='store'&&t.name&&/lumber|building supply/i.test(t.name))cat='hardware';
-    pois.push({id:'osm'+el.type[0]+el.id,lat:p.lat,lng:p.lng,cat,name:siteName(t,cat)});
-  }
+    if(S.mapMode==='mixed'){genFill(1);toast(`Map data unavailable (${why}) — showing generated ruins. Retrying in ${wait/6e4} min.`,'#f2a03d');}else toast(`Couldn't load map data (${why}). Retrying in ${wait/6e4} min — tip: ⚙️ More → 📦 Area pack makes loading instant.`,'#f2a03d');return;}
+  const{pois,nat,zones}=parsePlaces(j1.elements,here);
   applyScan({pois,nat,cand:[],raw:null},here,'partial');
   scanStatus='loading buildings…';
   const j2=await overpassBB(`way["building"]${A};`);
   let cand=[],raw=null;
   if(!j2)scanRetryAt=Date.now()+backoff();
-  if(j2){
-    raw=j2.elements.length;const ids=new Set(pois.map(p=>p.id));
-    for(const el of j2.elements){const id='osm'+el.type[0]+el.id;if(ids.has(id))continue;const t=el.tags||{},p=elPos(el);if(!p)continue;
-      const cat=classifyBuilding(t,elArea(el),p,zones);if(!cat)continue;cand.push({id,lat:p.lat,lng:p.lng,cat,name:siteName(t,cat)});}
-    cand=cand.map(c=>[dist(here,c),c]).sort((a,b)=>a[0]-b[0]).slice(0,800).map(x=>x[1]);
-  }
+  if(j2){const B=parseBuildings(j2.elements,pois,zones);raw=B.pts.length;cand=B.cand.map(c=>[dist(here,c),c]).sort((a,b)=>a[0]-b[0]).slice(0,800).map(x=>x[1]);}
   const res={t:Date.now(),c:here,pois,nat,cand,raw};
   if(j2){try{localStorage.setItem(key,JSON.stringify(res));const idx=JSON.parse(localStorage.getItem('drscan_idx')||'[]').filter(k=>k!==key);idx.push(key);
     while(idx.length>12)localStorage.removeItem(idx.shift());localStorage.setItem('drscan_idx',JSON.stringify(idx));}catch(e){}}
   scanning=false;applyScan(res,here,j2?'fresh':'places only (buildings failed)');
+}
+/* ---- shared parsers (live scans + area packs) ---- */
+const PLACES_Q=F=>`nwr["shop"]${F};nwr["amenity"~"^(pharmacy|fuel|restaurant|fast_food|cafe|bar|pub|hospital|clinic|doctors|dentist|veterinary|police|fire_station|school|library|townhall|post_office|place_of_worship|bank|community_centre)$"]${F};nwr["craft"]${F};nwr["office"]${F};way["landuse"~"^(industrial|commercial|retail)$"]${F};nwr["natural"~"^(wood|scrub|heath|bare_rock|scree|stone|cliff|rock|grassland)$"]${F};nwr["landuse"~"^(forest|orchard|quarry|meadow|farmland)$"]${F};nwr["leisure"="park"]${F};`;
+function parsePlaces(els,here){
+  const pois=[],nat=[],zones=[];
+  for(const el of els){
+    const t=el.tags||{},p=elPos(el);if(!p)continue;
+    if(['industrial','commercial','retail'].includes(t.landuse)&&!t.building){if(el.bounds)zones.push({type:t.landuse,b:el.bounds});
+      if(t.name){const cat=/lumber|hardware|building supply|home center/i.test(t.name)?'hardware':t.landuse==='industrial'?'industrial':'store';pois.push({id:'osm'+el.type[0]+el.id,lat:p.lat,lng:p.lng,cat,name:t.name});}continue;}
+    const nt=!t.building&&!t.shop&&!t.amenity&&natType(t);
+    if(nt){let c=p;if(here){const d=dist(here,c);if(d>600){const R=mulberry(hashStr('n'+el.id)),k=(150+R()*300)/d;c={lat:here.lat+(p.lat-here.lat)*k,lng:here.lng+(p.lng-here.lng)*k};}}
+      nat.push({id:'n'+el.type[0]+el.id,lat:c.lat,lng:c.lng,type:nt,n:nt==='tree'?5:3});continue;}
+    let cat=classify(t);if(!cat&&t.office)cat='civic';if(!cat)continue;
+    if(cat==='store'&&t.name&&/lumber|building supply/i.test(t.name))cat='hardware';
+    pois.push({id:'osm'+el.type[0]+el.id,lat:p.lat,lng:p.lng,cat,name:siteName(t,cat)});
+  }
+  return{pois,nat,zones};
+}
+function parseBuildings(els,pois,zones){
+  const ids=new Set(pois.map(p=>p.id)),cand=[],pts=[];
+  for(const el of els){const id='osm'+el.type[0]+el.id,t=el.tags||{},p=elPos(el);if(!p)continue;pts.push([+p.lat.toFixed(5),+p.lng.toFixed(5)]);if(ids.has(id))continue;
+    const cat=classifyBuilding(t,elArea(el),p,zones);if(!cat)continue;cand.push({id,lat:+p.lat.toFixed(6),lng:+p.lng.toFixed(6),cat,name:siteName(t,cat)});}
+  return{cand,pts};
+}
+/* ---- area pack: region.json next to index.html = instant map data, no slow servers ---- */
+let REGION=null;
+const regionReady=fetch('region.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.v===1&&j.bbox){REGION=j;}}).catch(()=>{});
+function regionRes(here){
+  const b=REGION&&REGION.bbox,m=.005;if(!b||here.lat<b[0]+m||here.lat>b[2]-m||here.lng<b[1]+m*1.36||here.lng>b[3]-m*1.36)return null;
+  const R=CFG.SCAN_R,near=(x,r)=>Math.abs(x.lat-here.lat)<r/111000&&dist(here,x)<r;
+  const cand=REGION.cand.filter(c=>near(c,R)).map(c=>[dist(here,c),c]).sort((a,b)=>a[0]-b[0]).slice(0,800).map(x=>x[1]);
+  let raw=0;for(const[la,ln]of REGION.pts)if(Math.abs(la-here.lat)<.006&&dist(here,{lat:la,lng:ln})<R)raw++;
+  return{t:REGION.made,c:here,pois:REGION.pois.filter(p=>near(p,R+50)),nat:REGION.nat.filter(n=>near(n,1000)),cand,raw};
+}
+let packBusy=false;
+async function buildPack(km){
+  if(packBusy||!pos)return;packBusy=true;
+  const c={...pos},half=km/2,dLat=half/111.32,dLng=half/(111.32*Math.cos(c.lat*toR));
+  const bbox=[c.lat-dLat,c.lng-dLng,c.lat+dLat,c.lng+dLng],n=Math.max(1,Math.round(km/2)),sLat=(bbox[2]-bbox[0])/n,sLng=(bbox[3]-bbox[1])/n;
+  const pack={v:1,made:Date.now(),bbox,pois:[],nat:[],cand:[],pts:[]},seen=new Set(),status=m=>sheet(`<h2>📦 Building area pack</h2><p>${m}</p><p class="dim sm">Keep this screen open. Busy servers can take ~1 min per chunk.</p>`);
+  let done=0;const total=n*n;
+  try{
+    for(let i=0;i<n;i++)for(let j=0;j<n;j++){
+      const s=bbox[0]+i*sLat,w=bbox[1]+j*sLng,F=`(${s.toFixed(5)},${w.toFixed(5)},${(s+sLat).toFixed(5)},${(w+sLng).toFixed(5)})`;
+      status(`Chunk ${done+1}/${total}: places…`);
+      const a=await overpass(`[out:json][timeout:170];(${PLACES_Q(F)});out tags bb;`,190000);if(!a)throw new Error('places: '+ovLog.join(' · '));
+      const P=parsePlaces(a.elements,null);
+      status(`Chunk ${done+1}/${total}: buildings…`);
+      const b=await overpass(`[out:json][timeout:170];(way["building"]${F};);out tags bb;`,190000);if(!b)throw new Error('buildings: '+ovLog.join(' · '));
+      const B=parseBuildings(b.elements,P.pois,P.zones);
+      for(const x of P.pois)if(!seen.has(x.id)){seen.add(x.id);pack.pois.push(x);}
+      for(const x of P.nat)if(!seen.has(x.id)){seen.add(x.id);pack.nat.push(x);}
+      for(const x of B.cand)if(!seen.has(x.id)){seen.add(x.id);pack.cand.push(x);}
+      pack.pts.push(...B.pts);done++;
+    }
+  }catch(e){packBusy=false;sheet(`<h2>📦 Area pack failed</h2><p>${esc(e.message)}</p><p class="dim sm">The servers are probably overloaded — try again later (early morning is fastest), or a smaller size.</p><button onclick="openPackBuilder()">Back</button>`);return;}
+  packBusy=false;REGION=pack;
+  const json=JSON.stringify(pack),blob=new Blob([json],{type:'application/json'}),url=URL.createObjectURL(blob);
+  sheet(`<h2>📦 Area pack ready</h2><p>${pack.pois.length} places, ${pack.cand.length} buildings, ${pack.nat.length} nature areas · ${(json.length/1048576).toFixed(2)} MB</p>
+  <p><b>It's active now on this device.</b> To make it permanent (and instant on every device):</p>
+  <ol class="sm"><li>Tap <b>Download region.json</b> below.</li><li>In your GitHub repo: <b>Add file → Upload files</b> → pick <b>region.json</b> (exact name, same folder as index.html) → Commit.</li></ol>
+  <a href="${url}" download="region.json"><button class="pri" style="width:100%">⬇️ Download region.json</button></a>
+  <p class="dim sm" style="margin-top:8px">If your phone renames it (e.g. "region (1).json"), rename it back to region.json before uploading.</p>`);
+  lastScan=null;scan();
+}
+function openPackBuilder(){
+  const b=REGION&&REGION.bbox,inP=b&&pos&&regionRes(pos);
+  sheet(`<h2>📦 Area pack</h2><div class="dim sm">Downloads all map data for an area once, so the game loads places instantly instead of waiting on slow public servers. Build it centered where you play (home is ideal).</div>
+  <p class="sm">${REGION?`Current pack: ${REGION.pois.length} places, ${REGION.cand.length} buildings · made ${new Date(REGION.made).toLocaleDateString()} · you are ${inP?'<b>inside</b> it ✅':'<b>outside</b> it'}`:'No area pack loaded yet.'}</p>
+  <h3>Build a pack centered here</h3>
+  <div style="display:grid;gap:8px">${[[2,'2 km × 2 km — town center / neighborhood (1 chunk)'],[4,'4 km × 4 km — town + outskirts (4 chunks)'],[6,'6 km × 6 km — e.g. Hinsdale + Brattleboro (9 chunks)']].map(([k,l])=>`<button ${pos?'':'disabled'} onclick="buildPack(${k})">${l}</button>`).join('')}</div>
+  <p class="dim sm">Bigger packs take longer (each chunk can take a minute when servers are busy) and the file is larger (~0.3–2 MB).</p>`);
 }
 const DENS={low:{n:'Low',hc:.0016,oc:.001,hMax:12,oMax:20,poi:70},med:{n:'Medium',hc:.001,oc:.0006,hMax:30,oMax:45,poi:35},high:{n:'High',hc:.0006,oc:.0004,hMax:70,oMax:90,poi:15}};
 let lastScanRes=null,lastScanHere=null;
@@ -1420,7 +1478,7 @@ function openSettings(){
   <h3>Location</h3><div class="sm dim">${demo?'Demo — tap the map to walk.':'GPS — '+(pos?'accuracy ±'+Math.round(acc)+' m':'waiting for fix')}</div>
   ${demo?`<div style="margin-top:6px">Walk speed: ${[1,3,5].map(v=>`<button class="sm ${demoSpeed===v?'pri':''}" onclick="demoSpeed=${v};openSettings()">${v}×</button>`).join(' ')}</div>`:''}
   <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${demo?'<button class="sm" onclick="closeSheet();startGPS(true)">Switch to GPS</button>':'<button class="sm" onclick="closeSheet();startDemo(true)">Switch to demo</button>'}
-  <button class="sm" onclick="lastScan=null;toast('Rescanning…');scan(true)">Rescan area</button><button class="sm" onclick="testServers()">🩺 Test map servers</button></div>
+  <button class="sm" onclick="lastScan=null;toast('Rescanning…');scan(true)">Rescan area</button><button class="sm" onclick="testServers()">🩺 Test map servers</button><button class="sm pri" onclick="openPackBuilder()">📦 Area pack</button></div>
   <h3>Danger zone</h3><button class="sm dng" id="rs" onclick="this.id==='rs2'?(localStorage.removeItem('${CFG.SAVE}'),location.reload()):(this.id='rs2',this.textContent='Tap again — wipes everything')">Reset save</button>
   <h3>How it works</h3><div class="sm dim">Walk within ${CFG.SCAV_RANGE} m of a location to search it; it restocks after ${CFG.COOLDOWN_MIN} min. Zombies chase you once they notice you — walkers are slower than you, runners aren't. Tap a zombie within ${CFG.MELEE_RANGE} m (${CFG.GUN_RANGE} m with a loaded gun) to strike first. Gunfire draws more. Food and water drain while you play; at zero you lose health. Rural areas have 🌲 trees, 🪨 rocks and 🌿 herbs to gather. At your base, build a workbench, oven, forge, apothecary, rain barrel and farm plots — crops grow in real time while you're away. Map data © OpenStreetMap contributors.</div>`);
 }
@@ -1437,7 +1495,7 @@ function firstFix(){
   if(started)return;started=true;meDot.addTo(map);accCircle.addTo(map);rangeRing.addTo(map);map.setView(pos,17);drawBase();drawCamps();scan();
   toast(S.base?'Welcome back, survivor.':'Tip: set a safehouse at home (🏚️).');
 }
-let lastFixAt=0,gpsWaitTimer=null;
+let lastFixAt=0,gpsWaitTimer=null,gpsErrAt=0;
 function onFix(p){
   const np={lat:p.coords.latitude,lng:p.coords.longitude},now=p.timestamp||Date.now(),a=p.coords.accuracy||0;
   if(pos&&a>150&&a>acc)return; // ignore a worse coarse fix once we have a good one
@@ -1463,6 +1521,7 @@ function startGPS(sw){
   navigator.geolocation.getCurrentPosition(onFix,()=>{},{enableHighAccuracy:false,maximumAge:300000,timeout:10000});
   watchId=navigator.geolocation.watchPosition(onFix,err=>{
     if(err.code===1){gpsHelp(1);return;}
+    gpsErrAt=Date.now();
     // timeouts/unavailable are retried automatically by the watch; only explain if we never got a fix
   },{enableHighAccuracy:true,maximumAge:5000,timeout:30000});
   clearTimeout(gpsWaitTimer);if(!started&&!pos)gpsWaitTimer=setTimeout(()=>{if(!pos&&!demo)gpsHelp(3);},25000);
@@ -1494,7 +1553,7 @@ function hud(){
   if(overloaded())c.push('<span class="chip y">🎒 Overloaded</span>');
   if(tooFast())c.push('<span class="chip r">🚗 Too fast — paused</span>');
   if(!demo&&!pos)c.push('<span class="chip y">📡 Locating…</span>');
-  if(!demo&&pos&&lastFixAt&&Date.now()-lastFixAt>90000)c.push('<span class="chip r">📡 GPS lost — tap 🎯</span>');
+  if(!demo&&pos&&gpsErrAt>lastFixAt&&Date.now()-lastFixAt>60000)c.push('<span class="chip r">📡 GPS lost — tap 🎯</span>');
   if(!demo&&acc>50)c.push(`<span class="chip y">Weak GPS ±${Math.round(acc)} m</span>`);
   if(S.base&&pos&&dist(pos,S.base)<=CFG.BASE_R)c.push('<span class="chip g">🏚️ Safe</span>');
   {const cp=nearCamp();if(cp)c.push(`<span class="chip g">🔥 ${esc(cp.name)}</span>`);}
